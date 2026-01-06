@@ -1,0 +1,164 @@
+/* ===== BUTTONS STYLES ===== */
+/* Boutons flottants (menu) et nom Zenith */
+
+/* Menu Container */
+.menu-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 50;
+}
+
+/* Menu Button */
+.menu-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.menu-btn:hover {
+    background: var(--glass-bg-hover);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.menu-btn:active {
+    transform: translateY(-1px) scale(1);
+}
+
+/* Menu Dropdown */
+.menu-dropdown {
+    position: absolute;
+    bottom: 60px;
+    right: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column-reverse; /* Stack upwards */
+    gap: 1rem;
+    min-width: auto;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    pointer-events: none; /* Prevent clicks when hidden */
+}
+
+.menu-dropdown.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Menu Items */
+.menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    padding: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    position: relative; /* For tooltip positioning */
+}
+
+.menu-item span {
+    display: none; /* Hide text inside button */
+}
+
+/* Tooltip Styles */
+.menu-item .tooltip {
+    display: block;
+    position: absolute;
+    right: 60px; /* Position to the left of the button */
+    top: 50%;
+    transform: translateY(-50%) translateX(10px);
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: rgba(255, 255, 255, 0.95);
+    padding: 0.5rem 0.8rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.menu-item:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+}
+
+.menu-item:hover {
+    background: var(--glass-bg-hover);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.menu-item i {
+    width: auto;
+    text-align: center;
+    font-size: 1.2rem;
+}
+
+/* Branding Zenith avec logo */
+.zenith-branding {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.zenith-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.zenith-name {
+    font-family: 'Skyer', sans-serif;
+    font-size: 2rem;
+    color: rgb(255, 255, 255);
+    letter-spacing: 2px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}

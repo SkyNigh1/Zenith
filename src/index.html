@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https:;">
+  <title>Zenith</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="titlebar">
+    <div id="tabs-container">
+      <button id="new-tab-btn" title="Nouvel onglet (Ctrl+T)">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+    <div id="window-controls">
+      <button id="minimize-btn" title="Réduire">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="6" y1="12" x2="18" y2="12"/></svg>
+      </button>
+      <button id="maximize-btn" title="Agrandir">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+      </button>
+      <button id="close-btn" title="Fermer">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="navbar">
+    <div id="nav-buttons">
+      <button id="back-btn" class="nav-btn" title="Retour">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button id="forward-btn" class="nav-btn" title="Avancer">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button id="refresh-btn" class="nav-btn" title="Rafraîchir">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+      <button id="home-btn" class="nav-btn" title="Accueil">
+        <svg class="icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </button>
+    </div>
+    <div id="url-container">
+      <input type="text" id="url-bar" placeholder="Rechercher ou entrer une URL" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="settings-container">
+      <button id="history-btn" class="nav-btn" title="Historique (Ctrl+H)">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </button>
+      <button id="downloads-btn" class="nav-btn" title="Téléchargements (Ctrl+J)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span id="downloads-badge" class="badge hidden">0</span>
+      </button>
+      <button id="permissions-btn" class="nav-btn" title="Permissions du site">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </button>
+      <button id="devtools-btn" class="nav-btn" title="Outils de développement (F12)">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </button>
+      <button id="settings-btn" class="nav-btn" title="Paramètres">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="settings-overlay"></div>
+  <div id="settings-menu">
+    <div class="settings-section">
+      <div class="settings-title">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Moteur de recherche
+      </div>
+      <select id="search-engine-select">
+        <option value="google">Google</option>
+        <option value="duckduckgo">DuckDuckGo</option>
+        <option value="bing">Bing</option>
+        <option value="brave">Brave</option>
+        <option value="ecosia">Ecosia</option>
+        <option value="qwant">Qwant</option>
+        <option value="startpage">Startpage</option>
+        <option value="yahoo">Yahoo</option>
+        <option value="yandex">Yandex</option>
+      </select>
+    </div>
+    <div class="settings-section">
+      <div class="settings-title">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Confidentialité
+      </div>
+      <button id="toggle-adblocker" class="settings-btn active">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Bloqueur de publicités
+        <span class="status"></span>
+      </button>
+      <button id="toggle-third-party" class="settings-btn active">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+        Bloquer cookies tiers
+        <span class="status"></span>
+      </button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-title">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>
+        Apparence
+      </div>
+      <button id="toggle-theme" class="settings-btn active">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        Mode sombre
+        <span class="status"></span>
+      </button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-title">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Données
+      </div>
+      <button id="clear-cookies" class="settings-btn">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Supprimer les cookies
+      </button>
+      <button id="clear-data" class="settings-btn">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        Effacer toutes les données
+      </button>
+      <button id="open-history" class="settings-btn">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historique
+      </button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-title">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01"/></svg>
+        Raccourcis
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-item"><span>Nouvel onglet</span><span class="shortcut-key">Ctrl+T</span></div>
+        <div class="shortcut-item"><span>Fermer onglet</span><span class="shortcut-key">Ctrl+W</span></div>
+        <div class="shortcut-item"><span>Rouvrir onglet</span><span class="shortcut-key">Ctrl+Shift+T</span></div>
+        <div class="shortcut-item"><span>Onglet suivant</span><span class="shortcut-key">Ctrl+Tab</span></div>
+        <div class="shortcut-item"><span>Barre d'URL</span><span class="shortcut-key">Ctrl+L</span></div>
+        <div class="shortcut-item"><span>Rafraîchir</span><span class="shortcut-key">F5</span></div>
+        <div class="shortcut-item"><span>Outils développeur</span><span class="shortcut-key">F12</span></div>
+        <div class="shortcut-item"><span>Console</span><span class="shortcut-key">Ctrl+Shift+J</span></div>
+        <div class="shortcut-item"><span>Inspecter</span><span class="shortcut-key">Ctrl+Shift+C</span></div>
+        <div class="shortcut-item"><span>Téléchargements</span><span class="shortcut-key">Ctrl+J</span></div>
+        <div class="shortcut-item"><span>Historique</span><span class="shortcut-key">Ctrl+H</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-content">
+    <div id="webviews-container"></div>
+    <div id="devtools-resizer"></div>
+    <div id="devtools-panel">
+      <div id="devtools-container"></div>
+    </div>
+  </div>
+
+  <!-- Modal de demande de permission -->
+  <div id="permission-modal" class="modal-hidden">
+    <div id="permission-modal-content">
+      <div id="permission-icon">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div id="permission-text">
+        <span id="permission-origin"></span> veut accéder à <span id="permission-type"></span>
+      </div>
+      <div id="permission-buttons">
+        <button id="permission-deny" class="permission-btn deny">Bloquer</button>
+        <button id="permission-allow" class="permission-btn allow">Autoriser</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu des permissions du site -->
+  <div id="permissions-overlay"></div>
+  <div id="permissions-menu">
+    <div class="permissions-header">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Permissions du site</span>
+    </div>
+    <div id="current-site-origin"></div>
+    <div id="permissions-list"></div>
+    <div class="permissions-actions">
+      <button id="reset-site-permissions" class="settings-btn">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Réinitialiser les permissions
+      </button>
+    </div>
+  </div>
+
+  <!-- Panneau de téléchargements -->
+  <div id="downloads-overlay"></div>
+  <div id="downloads-panel">
+    <div class="downloads-header">
+      <div class="downloads-title">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Téléchargements</span>
+      </div>
+      <div class="downloads-actions">
+        <button id="clear-downloads" class="downloads-action-btn" title="Effacer l'historique">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+        <button id="close-downloads" class="downloads-action-btn" title="Fermer">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="downloads-list">
+      <div class="downloads-empty">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Aucun téléchargement</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
