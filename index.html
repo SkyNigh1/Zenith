@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr" id="htmlRoot">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tab</title>
+    <link rel="icon" href="assets/img/logo.ico">
+    <!-- CSS Modules -->
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/layout.css">
+    <link rel="stylesheet" href="styles/shortcuts.css">
+    <link rel="stylesheet" href="styles/modal.css">
+    <link rel="stylesheet" href="styles/buttons.css">
+    <link rel="stylesheet" href="styles/responsive.css">
+    <link rel="stylesheet" href="styles/weather.css">
+    <link rel="stylesheet" href="styles/calendar.css">
+    <link rel="stylesheet" href="styles/notes.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- GSAP for smooth animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Loader pour changement d'animation -->
+    <div class="animation-loader" id="animationLoader">
+        <div class="spinner"></div>
+        <div class="message" data-fr="Chargement de l'animation..." data-en="Loading animation...">Chargement de l'animation...</div>
+    </div>
+
+    <!-- Widgets Container -->
+    <div class="widgets-container">
+        <!-- Weather Widget -->
+        <div class="weather-card" id="weatherCard">
+            <!-- Content injected by JS -->
+        </div>
+        
+        <!-- Calendar Widget -->
+        <div class="calendar-wrapper">
+            <div class="calendar-card" id="calendarCard">
+                <!-- Content injected by JS -->
+            </div>
+            <div class="calendar-events-panel" id="calendarEventsPanel">
+                <div class="events-panel-header">
+                    <span id="eventsPanelDate"></span>
+                </div>
+                <div class="events-panel-content" id="eventsPanelContent">
+                    <!-- Events injected by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Interface -->
+    <div class="notes-container" id="notesContainer">
+        <!-- Custom Modal -->
+        <div class="custom-modal-overlay" id="customModal" style="display: none;">
+            <div class="custom-modal">
+                <h3 id="modalTitle">Titre</h3>
+                <p id="modalMessage" class="modal-message"></p>
+                <input type="text" id="modalInput" autocomplete="off">
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="modalCancelBtn">Annuler</button>
+                    <button class="modal-btn confirm" id="modalConfirmBtn">Valider</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
+
+        <div class="notes-sidebar">
+            <div class="sidebar-header">
+                <h2 data-fr="Mes Notes" data-en="My Notes">Mes Notes</h2>
+                <div class="sidebar-actions">
+                    <button class="sidebar-btn undo-btn" id="undoBtn" title="Annuler la dernière suppression" style="display: none;">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                    <button class="sidebar-btn" id="collapseTreeBtn" title="Tout déployer">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="sidebar-btn" id="newFolderBtn" title="Nouveau dossier">
+                        <i class="fas fa-folder-plus"></i>
+                    </button>
+                    <button class="sidebar-btn" id="newFileBtn" title="Nouvelle note">
+                        <i class="fas fa-file-medical"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="file-tree" id="fileTree">
+                <!-- Tree content injected by JS -->
+            </div>
+        </div>
+        
+        <div class="notes-main">
+            <div class="editor-toolbar">
+                <div class="toolbar-left">
+                    <button class="format-btn" data-command="bold" title="Gras"><i class="fas fa-bold"></i></button>
+                    <button class="format-btn" data-command="italic" title="Italique"><i class="fas fa-italic"></i></button>
+                    <button class="format-btn" data-command="strikeThrough" title="Barré"><i class="fas fa-strikethrough"></i></button>
+                    <div style="width: 1px; height: 20px; background: var(--glass-border); margin: 0 5px;"></div>
+                    <button class="format-btn" data-command="formatBlock" data-value="h1" title="Titre 1">H1</button>
+                    <button class="format-btn" data-command="formatBlock" data-value="h2" title="Titre 2">H2</button>
+                    <button class="format-btn" data-command="formatBlock" data-value="blockquote" title="Citation"><i class="fas fa-quote-right"></i></button>
+                </div>
+                <div class="toolbar-right">
+                    <button class="rename-note-btn" id="renameNoteBtn" title="Renommer la note">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <span class="current-note-name" id="currentNoteName">Nouvelle note</span>
+                </div>
+            </div>
+            <div class="editor-content" id="noteEditor" contenteditable="true" placeholder="Commencez à écrire..."></div>
+            
+            <div class="empty-state" id="emptyState">
+                <img src="assets/img/logo.png" alt="" class="empty-state-bg-logo">
+                <div class="empty-state-content">
+                    <p>Aucun fichier ouvert</p>
+                    <button class="empty-state-btn" id="createNoteEmptyBtn">
+                        Créer une note
+                    </button>
+                </div>
+            </div>
+
+            <div class="notes-footer">
+                <div class="notes-branding">
+                    <img src="assets/img/logo.png" alt="Zenith Logo" class="notes-logo">
+                    <div class="notes-name">Zenith</div>
+                </div>
+                <button class="close-notes-btn" id="closeNotesBtn" title="Retour à l'accueil">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Interface de la page d'accueil -->
+    <div class="homepage-container">
+        <!-- Horloge et Date -->
+        <div class="time-container">
+            <div class="time" id="time">00:00</div>
+            <div class="date" id="date" data-fr="Chargement..." data-en="Loading...">Chargement...</div>
+        </div>
+        
+        <!-- Barre de recherche -->
+        <div class="search-container">
+            <form id="searchForm" class="search-form">
+                <input type="text" id="searchInput" class="search-input" data-fr-placeholder="Rechercher sur le web..." data-en-placeholder="Search the web..." placeholder="Rechercher sur le web..." autocomplete="off">
+                <i class="fas fa-search search-icon"></i>
+            </form>
+        </div>
+        
+        <!-- Raccourcis -->
+        <div class="shortcuts-container">
+            <div class="shortcuts-grid" id="shortcutsGrid">
+                <!-- Les raccourcis seront ajoutés ici dynamiquement -->
+            </div>
+            <button class="add-shortcut-btn" id="addShortcutBtn">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Modale pour ajouter un raccourci -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 data-fr="Ajouter un raccourci" data-en="Add a shortcut">Ajouter un raccourci</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="shortcutForm" class="modal-form">
+                <div class="form-group">
+                    <label for="shortcutName" data-fr="Nom" data-en="Name">Nom</label>
+                    <input type="text" id="shortcutName" required data-fr-placeholder="Ex: Google" data-en-placeholder="E.g.: Google" placeholder="Ex: Google">
+                </div>
+                <div class="form-group">
+                    <label for="shortcutUrl">URL</label>
+                    <input type="url" id="shortcutUrl" required placeholder="Ex: https://google.com">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="btnCancel" data-fr="Annuler" data-en="Cancel">Annuler</button>
+                    <button type="submit" class="btn-submit" data-fr="Ajouter" data-en="Add">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modale de personnalisation -->
+    <div class="modal-overlay" id="customizeModalOverlay">
+        <div class="modal customize-modal">
+            <div class="modal-header">
+                <h2 data-fr="Personnaliser" data-en="Customize">Personnaliser</h2>
+                <button class="modal-close" id="customizeModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="customize-content">
+                <!-- Type d'animation -->
+                <div class="customize-section">
+                    <h3 data-fr="Animation de fond" data-en="Background Animation">Animation de fond</h3>
+                    <div class="animation-select-container">
+                        <select id="animationTypeSelect" class="animation-select">
+                            <option value="galaxy" data-fr="Galaxy" data-en="Galaxy">Galaxy</option>
+                            <option value="medusa" data-fr="Medusa" data-en="Medusa">Medusa</option>
+                            <option value="unsplash-abstract" data-fr="Fond - Abstrait (HQ)" data-en="Wallpaper - Abstract (HQ)">Fond - Abstrait (HQ)</option>
+                            <option value="unsplash-landscape" data-fr="Fond - Paysage (HQ)" data-en="Wallpaper - Landscape (HQ)">Fond - Paysage (HQ)</option>
+                            <option value="unsplash-snow" data-fr="Fond - Montagnes (HQ)" data-en="Wallpaper - Mountains (HQ)">Fond - Montagnes (HQ)</option>
+                            <option value="custom" data-fr="Image personnalisée" data-en="Custom Image">Image personnalisée</option>
+                        </select>
+                        <input type="file" id="customImageInput" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+                
+                <!-- Thème -->
+                <div class="customize-section">
+                    <h3 data-fr="Thème" data-en="Theme">Thème</h3>
+                    <div class="theme-options">
+                        <button class="theme-btn" data-theme="dark" id="themeDark">
+                            <i class="fas fa-moon"></i>
+                            <span data-fr="Sombre" data-en="Dark">Sombre</span>
+                        </button>
+                        <button class="theme-btn" data-theme="light" id="themeLight">
+                            <i class="fas fa-sun"></i>
+                            <span data-fr="Lumineux" data-en="Light">Lumineux</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Couleur d'accentuation -->
+                <div class="customize-section">
+                    <h3 data-fr="Couleur d'accentuation" data-en="Accent color">Couleur d'accentuation</h3>
+                    <div class="color-picker-container">
+                        <input type="color" id="accentColor" class="color-picker" value="#6496ff">
+                        <span class="color-label" id="accentColorLabel">#6496ff</span>
+                    </div>
+                </div>
+                
+                <!-- Couleurs de l'animation -->
+                <div class="customize-section" id="animationColorsSection">
+                    <h3 data-fr="Couleurs de l'animation" data-en="Animation colors">Couleurs de l'animation</h3>
+                    <div class="animation-colors">
+                        <div class="color-option">
+                            <label id="color1Label" data-fr="Couleur principale" data-en="Primary color">Couleur principale</label>
+                            <div class="color-picker-container">
+                                <input type="color" id="animationColor1" class="color-picker" value="#ff6030">
+                                <span class="color-label" id="color1ValueLabel">#ff6030</span>
+                            </div>
+                        </div>
+                        <div class="color-option">
+                            <label id="color2Label" data-fr="Couleur secondaire" data-en="Secondary color">Couleur secondaire</label>
+                            <div class="color-picker-container">
+                                <input type="color" id="animationColor2" class="color-picker" value="#1b3984">
+                                <span class="color-label" id="color2ValueLabel">#1b3984</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- eCalendar Integration -->
+                <div class="customize-section" id="ecalendarSection" style="display: none;">
+                    <h3 data-fr="Lien eCalendar (ICS)" data-en="eCalendar Link (ICS)">Lien eCalendar (ICS)</h3>
+                    <div class="ecalendar-input-container">
+                        <input type="url" id="ecalendarUrl" class="ecalendar-input" placeholder="https://..." autocomplete="off">
+                        <button class="ecalendar-save-btn" id="ecalendarSaveBtn">
+                            <i class="fas fa-save"></i>
+                        </button>
+                    </div>
+                    <p class="ecalendar-hint" data-fr="Collez le lien ICS de votre calendrier" data-en="Paste your calendar ICS link">Collez le lien ICS de votre calendrier</p>
+                </div>
+                
+                <!-- Bouton Reset -->
+                <button class="reset-btn" id="resetSettings">
+                    <i class="fas fa-undo"></i>
+                    <span data-fr="Réinitialiser" data-en="Reset">Réinitialiser</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Menu Button and Dropdown -->
+    <div class="menu-container">
+        <div class="menu-dropdown" id="menuDropdown">
+            <button class="menu-item" id="customizeBtn">
+                <i class="fas fa-palette"></i>
+                <span class="tooltip" data-fr="Apparence" data-en="Appearance">Apparence</span>
+            </button>
+            <button class="menu-item" id="weatherToggleBtn">
+                <i class="fas fa-cloud-sun"></i>
+                <span class="tooltip" id="weatherTooltip" data-fr="Activer la météo en temps réel" data-en="Enable real-time weather">Activer la météo en temps réel</span>
+            </button>
+            <button class="menu-item" id="calendarToggleBtn">
+                <i class="fas fa-calendar-alt"></i>
+                <span class="tooltip" id="calendarTooltip" data-fr="Activer le calendrier" data-en="Enable calendar">Activer le calendrier</span>
+            </button>
+            <button class="menu-item" id="planningBtn" style="display: none;">
+                <i class="fas fa-calendar-week"></i>
+                <span class="tooltip" data-fr="Planning" data-en="Planning">Planning</span>
+            </button>
+            <button class="menu-item" id="notesBtn">
+                <i class="fas fa-sticky-note"></i>
+                <span class="tooltip" data-fr="Notes" data-en="Notes">Notes</span>
+            </button>
+        </div>
+        <button class="menu-btn" id="menuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <div class="zenith-branding">
+        <img src="assets/img/logo.png" alt="Zenith Logo" class="zenith-logo">
+        <div class="zenith-name">Zenith</div>
+    </div>
+    
+    <!-- Planning Interface -->
+    <div class="planning-container" id="planningContainer">
+        <div class="planning-header">
+            <div class="planning-controls">
+                <button class="planning-nav-btn" id="prevWeekBtn"><i class="fas fa-chevron-left"></i></button>
+                <h2 id="planningTitle">Semaine du ...</h2>
+                <button class="planning-nav-btn" id="nextWeekBtn"><i class="fas fa-chevron-right"></i></button>
+                <button class="planning-today-btn" id="planningTodayBtn">Aujourd'hui</button>
+            </div>
+            <button class="close-planning-btn" id="closePlanningBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="planning-grid-wrapper">
+            <div class="planning-header-row">
+                <div class="time-header-spacer"></div>
+                <div class="days-header-grid" id="planningDaysHeader">
+                    <!-- Day headers injected by JS -->
+                </div>
+            </div>
+            <div class="planning-scroll-container">
+                <div class="planning-body-row">
+                    <div class="planning-time-column" id="planningTimeColumn">
+                        <!-- Time slots injected by JS -->
+                    </div>
+                    <div class="planning-content-grid" id="planningGrid">
+                        <!-- Day content columns injected by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="js/settings.js"></script>
+    <script src="js/translation.js"></script>
+    <script src="js/animation-manager.js"></script>
+    <!-- galaxy.js et medusa.js sont chargés dynamiquement par animation-manager.js si nécessaire -->
+    <script src="js/clock.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/shortcuts.js"></script>
+    <script src="js/modal-customize.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/notes.js"></script>
+    <script src="js/browser-theme-sync.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

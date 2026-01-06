@@ -1,0 +1,131 @@
+/* ===== RESPONSIVE STYLES ===== */
+/* Media queries pour mobile et tablette */
+
+@media (max-width: 768px) {
+    /* Horloge et date */
+    .time {
+        font-size: 4rem;
+    }
+    
+    .date {
+        font-size: 1.1rem;
+    }
+    
+    /* Recherche */
+    .search-input {
+        padding: 1rem 1.2rem 1rem 3rem;
+        font-size: 1rem;
+    }
+    
+    /* Raccourcis */
+    .shortcuts-grid {
+        gap: 0.8rem;
+    }
+    
+    .shortcut-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .add-shortcut-btn {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .add-shortcut-btn i {
+        font-size: 1.2rem;
+    }
+    
+    .shortcut-name {
+        font-size: 0.8rem;
+        max-width: 100px;
+    }
+    
+    /* Modales */
+    .modal {
+        padding: 1.5rem;
+        max-width: 95%;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    /* Modale de personnalisation - passer en une colonne */
+    .customize-content {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        grid-template-areas: 
+            "theme"
+            "accent"
+            "galaxy"
+            "reset";
+    }
+    
+    .theme-options {
+        flex-direction: row;
+    }
+    
+    /* Boutons */
+    .info-btn,
+    .customize-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1.1rem;
+    }
+    
+    .info-btn {
+        bottom: 1.5rem;
+        left: 1.5rem;
+    }
+    
+    .customize-btn {
+        bottom: 1.5rem;
+        right: 1.5rem;
+    }
+    
+    .zenith-branding {
+        bottom: 1.5rem;
+    }
+    
+    .zenith-logo {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .zenith-name {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Horloge et date pour très petits écrans */
+    .time {
+        font-size: 3rem;
+    }
+    
+    .date {
+        font-size: 1rem;
+    }
+    
+    .time-container {
+        margin-top: 8vh;
+    }
+    
+    .search-container {
+        margin-top: 4vh;
+    }
+    
+    .shortcuts-container {
+        margin-top: 3vh;
+    }
+    
+    .zenith-logo {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .zenith-name {
+        font-size: 1.3rem;
+    }
+}
