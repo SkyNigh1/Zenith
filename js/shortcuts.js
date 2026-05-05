@@ -75,7 +75,6 @@ class ShortcutManager {
                 id: Date.now(),
                 name: name,
                 url: url,
-                icon: this.getFaviconUrl(url)
             };
             
             this.shortcuts.push(shortcut);
@@ -91,42 +90,63 @@ class ShortcutManager {
         this.renderShortcuts();
     }
     
-    getFaviconUrl(url) {
+    getFaviconSources(url) {
         try {
-            const urlObj = new URL(url);
-            // Utilise l'API Google pour récupérer le favicon
-            return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=64`;
+            const { hostname } = new URL(url);
+            const rootDomain = hostname.split('.').slice(-2).join('.');
+            const wwwDomain = `www.${rootDomain}`;
+            const sources = [
+                `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+                `https://${hostname}/favicon.ico`,
+                `https://logo.clearbit.com/${hostname}`,
+            ];
+            if (rootDomain !== hostname) {
+                sources.push(
+                    `https://www.google.com/s2/favicons?domain=${rootDomain}&sz=64`,
+                    `https://${rootDomain}/favicon.ico`,
+                    `https://logo.clearbit.com/${rootDomain}`,
+                );
+            }
+            if (hostname !== wwwDomain && rootDomain !== wwwDomain) {
+                sources.push(
+                    `https://www.google.com/s2/favicons?domain=${wwwDomain}&sz=64`,
+                    `https://${wwwDomain}/favicon.ico`,
+                    `https://logo.clearbit.com/${wwwDomain}`,
+                );
+            }
+            return sources;
         } catch (e) {
-            // Si l'URL est invalide, utilise l'icône planète par défaut
-            return 'assets/img/planet.svg';
+            return [];
         }
     }
-    
+
+    getFaviconUrl(url) {
+        const sources = this.getFaviconSources(url);
+        return sources[0] ?? 'assets/img/planet.svg';
+    }
+
     renderShortcuts() {
         this.grid.innerHTML = '';
-        
+
         this.shortcuts.forEach(shortcut => {
             const item = document.createElement('a');
             item.className = 'shortcut-item';
             item.href = shortcut.url;
             item.target = '_blank';
-            
+
             const icon = document.createElement('img');
             icon.className = 'shortcut-icon';
-            icon.src = shortcut.icon;
-            
-            // Gérer les erreurs de chargement
-            icon.onerror = () => {
-                icon.src = 'assets/img/planet.svg';
+
+            const fallbacks = [...this.getFaviconSources(shortcut.url), 'assets/img/planet.svg'];
+            let fallbackIndex = 0;
+            const tryNext = () => {
+                icon.src = fallbacks[fallbackIndex++] ?? 'assets/img/planet.svg';
             };
-            
-            // Détecter les favicons génériques de Google et les remplacer par planet.svg
+            icon.onerror = tryNext;
             icon.onload = () => {
-                // Si l'image est très petite (16x16 ou moins), c'est probablement le favicon générique
-                if (icon.naturalWidth <= 16 && icon.naturalHeight <= 16) {
-                    icon.src = 'assets/img/planet.svg';
-                }
+                if (icon.naturalWidth <= 16 && icon.naturalHeight <= 16) tryNext();
             };
+            tryNext();
             
             const name = document.createElement('span');
             name.className = 'shortcut-name';

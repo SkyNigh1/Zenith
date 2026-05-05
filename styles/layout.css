@@ -23,11 +23,12 @@
 }
 
 .time {
+    font-family: 'Inter', sans-serif;
     font-size: 6rem;
-    font-weight: 300;
+    font-weight: 400;
     color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    letter-spacing: -2px;
+    letter-spacing: -3px;
     margin-bottom: 0.5rem;
 }
 
