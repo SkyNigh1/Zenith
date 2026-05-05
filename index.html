@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Tab</title>
+    <link rel="icon" href="assets/img/logo.ico">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles/main.css">
+
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+
+    <!-- Background Layer (chargé par app.js avec Unsplash abstract) -->
+    <div id="backgroundImage"></div>
+    <canvas id="galaxyCanvas" style="display:none;"></canvas>
+
+    <!-- ===== PANNEAU GAUCHE : Météo ===== -->
+    <div class="left-panel">
+        <div class="weather-widget glass-card" id="weatherWidget">
+            <div class="weather-loading">
+                <i class="fas fa-cloud-sun"></i>
+                <span>Chargement météo...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== PANNEAU DROIT : Contrôles + Calendrier ===== -->
+    <div class="right-panel">
+        <div class="top-controls">
+            <button class="ctrl-btn" id="expandBtn" title="Plein écran">
+                <i class="fas fa-expand-arrows-alt"></i>
+            </button>
+            <button class="ctrl-btn" id="imageBtn" title="Changer l'image">
+                <i class="fas fa-image"></i>
+            </button>
+            <button class="ctrl-btn" id="customizeBtn" title="Personnaliser">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+
+        <div class="calendar-widget glass-card" id="calendarWidget">
+            <!-- Contenu injecté par calendar.js -->
+        </div>
+    </div>
+
+    <!-- ===== CONTENU CENTRAL ===== -->
+    <main class="main-content" id="mainContent">
+        <div class="center-block">
+
+            <!-- Horloge -->
+            <div class="clock-block">
+                <div class="time-display">
+                    <span class="time-digits" id="timeDigits">00:00</span>
+                    <span class="time-ampm" id="timeAmpm">AM</span>
+                </div>
+                <div class="date-display" id="dateDisplay">Chargement...</div>
+            </div>
+
+            <!-- Branding -->
+            <div class="branding-block">
+                <h1 class="brand-name">Zenith</h1>
+            </div>
+
+            <!-- Barre de recherche -->
+            <div class="search-wrapper">
+                <form id="searchForm" class="search-form">
+                    <i class="fas fa-search search-icon-left"></i>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        class="search-input"
+                        placeholder="Rechercher avec Zenith..."
+                        autocomplete="off"
+                    >
+                    <button type="button" class="search-sparkle-btn" title="Recherche IA">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 1L14.5 9.5L23 12L14.5 14.5L12 23L9.5 14.5L1 12L9.5 9.5L12 1Z"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Raccourcis -->
+            <div class="shortcuts-wrapper">
+                <div class="shortcuts-grid" id="shortcutsGrid">
+                    <!-- Injecté par shortcuts.js -->
+                </div>
+                <button class="shortcut-add-btn" id="addShortcutBtn">
+                    <div class="shortcut-icon-wrap shortcut-add-icon-wrap">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                    <span class="shortcut-name">Ajouter</span>
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Flèche bas — clic = ouvrir le chat IA -->
+    <div class="scroll-hint" id="scrollHint">
+        <div class="scroll-hint-inner">
+            <i class="fas fa-chevron-down"></i>
+        </div>
+    </div>
+
+    <!-- ===== PANNEAU CHAT IA ===== -->
+    <div class="chat-panel" id="chatPanel">
+
+        <!-- Sidebar conversations -->
+        <div class="chat-sidebar" id="chatSidebar">
+            <div class="sidebar-top">
+                <button class="sidebar-new-btn" id="newConvBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>Nouvelle conversation</span>
+                </button>
+            </div>
+            <div class="conv-list" id="convList"></div>
+        </div>
+
+        <!-- Zone principale -->
+        <div class="chat-main">
+
+            <!-- Header chat -->
+            <div class="chat-header">
+                <button class="chat-back-btn" id="chatBackBtn" title="Retour">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="chat-branding">
+                    <div class="chat-title-block">
+                        <span class="chat-title">Zenith</span>
+                        <span class="chat-badge">AI</span>
+                    </div>
+                </div>
+                <div class="chat-header-controls">
+                    <select id="modelSelect" class="model-select"></select>
+                </div>
+            </div>
+
+            <!-- Messages — peuplé par chat.js/_render() -->
+            <div class="chat-messages" id="chatMessages"></div>
+
+            <!-- Input -->
+            <div class="chat-input-area">
+                <div class="chat-input-wrapper">
+                    <textarea
+                        id="chatInput"
+                        class="chat-textarea"
+                        placeholder="Posez votre question..."
+                        rows="1"
+                    ></textarea>
+                    <button class="chat-send-btn" id="chatSendBtn" disabled>
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>
+                <p class="chat-disclaimer">Zenith AI peut faire des erreurs.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ===== MODAL : Ajouter un raccourci ===== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Ajouter un raccourci</h3>
+                <button class="modal-close-btn" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="shortcutForm">
+                <div class="form-group">
+                    <label for="shortcutName">Nom</label>
+                    <input type="text" id="shortcutName" placeholder="Ex: Google" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="shortcutUrl">URL</label>
+                    <input type="url" id="shortcutUrl" placeholder="https://google.com" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" id="btnCancel">Annuler</button>
+                    <button type="submit" class="btn-submit">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== MODAL : Personnalisation ===== -->
+    <div class="modal-overlay" id="customizeModalOverlay">
+        <div class="modal-card customize-modal-card">
+            <div class="modal-header">
+                <h3>Personnaliser</h3>
+                <button class="modal-close-btn" id="customizeModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="customize-sections">
+
+                <!-- Clés API Groq -->
+                <div class="customize-section">
+                    <label class="section-label">
+                        <i class="fas fa-key" style="margin-right:0.4rem;opacity:0.7"></i>
+                        Clés API Groq
+                    </label>
+                    <div id="groqKeysList" class="groq-keys-list">
+                        <!-- injecté par app.js -->
+                    </div>
+                    <div class="key-add-row">
+                        <input type="password" id="newGroqKeyInput" class="custom-input" placeholder="gsk_..." autocomplete="off">
+                        <button class="btn-submit" id="addGroqKeyBtn" style="padding:0.55rem 0.9rem;flex-shrink:0;">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <p class="hint-text">Plusieurs clés = rotation automatique pour maximiser les requêtes</p>
+                </div>
+
+                <!-- Séparateur -->
+                <div style="height:1px;background:rgba(255,255,255,0.07);margin:0 -0.25rem"></div>
+
+                <!-- Calendrier ICS -->
+                <div class="customize-section">
+                    <label class="section-label">
+                        <i class="fas fa-calendar-alt" style="margin-right:0.4rem;opacity:0.7"></i>
+                        Calendrier ICS
+                    </label>
+                    <div class="ics-input-row">
+                        <input type="url" id="ecalendarUrl" class="custom-input" placeholder="https://...">
+                        <button class="btn-submit" id="ecalendarSaveBtn" style="padding: 0.55rem 1rem;">
+                            <i class="fas fa-save"></i>
+                        </button>
+                    </div>
+                    <p class="hint-text">Collez le lien ICS de votre calendrier</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/settings.js"></script>
+    <script src="js/animation-manager.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/shortcuts.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+</html>
