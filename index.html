@@ -157,8 +157,16 @@
                 <div id="chatDropZone" class="chat-dropzone">Goutte tes fichiers ici</div>
                 <div id="chatAttachments" class="chat-attachments"></div>
                 <div class="chat-input-wrapper">
+                    <button class="chat-mode-btn" id="chatModeBtn" title="Changer de mode">
+                        <i class="fas fa-bolt mode-btn-icon"></i>
+                        <span class="mode-btn-name">Expert</span>
+                        <i class="fas fa-chevron-up" style="font-size:0.55rem;opacity:0.5;margin-left:1px"></i>
+                    </button>
                     <button class="chat-mic-btn" id="chatMicBtn" title="Saisie vocale">
                         <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="chat-attach-btn" id="chatAttachBtn" title="Joindre une image">
+                        <i class="fas fa-image"></i>
                     </button>
                     <textarea
                         id="chatInput"
@@ -229,6 +237,27 @@
                         </button>
                     </div>
                     <p class="hint-text">Plusieurs clés = rotation automatique pour maximiser les requêtes</p>
+                </div>
+
+                <!-- Séparateur -->
+                <div style="height:1px;background:rgba(255,255,255,0.07);margin:0 -0.25rem"></div>
+
+                <!-- Mémoire -->
+                <div class="customize-section">
+                    <label class="section-label">
+                        <i class="fas fa-brain" style="margin-right:0.4rem;opacity:0.7"></i>
+                        Mémoire
+                    </label>
+                    <div id="memoryList" class="groq-keys-list">
+                        <!-- injecté par app.js -->
+                    </div>
+                    <div class="key-add-row">
+                        <input type="text" id="newMemoryInput" class="custom-input" placeholder="Je préfère les réponses courtes..." autocomplete="off">
+                        <button class="btn-submit" id="addMemoryBtn" style="padding:0.55rem 0.9rem;flex-shrink:0;">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <p class="hint-text">Ou tapez /mémorise [fait] dans le chat pour ajouter automatiquement</p>
                 </div>
 
                 <!-- Séparateur -->

@@ -179,6 +179,7 @@ function initCustomizeModal() {
 
     openBtn?.addEventListener('click', () => {
         renderGroqKeys();
+        renderMemory();
         overlay.classList.add('active');
     });
     closeBtn?.addEventListener('click', closeModal);
@@ -205,12 +206,50 @@ function initCustomizeModal() {
     };
     addKeyBtn?.addEventListener('click', doAddKey);
     newKeyInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAddKey(); } });
+
+    // Mémoire
+    const newMemoryInput = document.getElementById('newMemoryInput');
+    const addMemoryBtn   = document.getElementById('addMemoryBtn');
+    const doAddMemory = () => {
+        const val = newMemoryInput?.value.trim();
+        if (!val) return;
+        window.ZenithAI?.addMemory(val);
+        if (newMemoryInput) newMemoryInput.value = '';
+        renderMemory();
+    };
+    addMemoryBtn?.addEventListener('click', doAddMemory);
+    newMemoryInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAddMemory(); } });
 }
+
+function renderMemory() {
+    const list = document.getElementById('memoryList');
+    if (!list || !window.ZenithAI) return;
+    const items = window.ZenithAI._loadMemory();
+    if (!items.length) {
+        list.innerHTML = '<p style="font-size:0.72rem;color:var(--text-tertiary);padding:0.2rem 0;">Aucun souvenir enregistré</p>';
+        return;
+    }
+    list.innerHTML = items.map(m => `
+        <div class="groq-key-row">
+            <span class="groq-key-label" style="font-family:inherit;white-space:normal;">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+            <button class="groq-key-del" data-id="${m.id}" title="Oublier">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+    list.querySelectorAll('.groq-key-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+            window.ZenithAI.removeMemory(btn.dataset.id);
+            renderMemory();
+        });
+    });
+}
+window.renderMemory = renderMemory;
 
 // Accessible globalement pour les messages d'erreur inline du chat
 window.openSettings = () => {
     const overlay = document.getElementById('customizeModalOverlay');
-    if (overlay) { renderGroqKeys(); overlay.classList.add('active'); }
+    if (overlay) { renderGroqKeys(); renderMemory(); overlay.classList.add('active'); }
 };
 
 // ---- Chat panel (transitions + input) ----
