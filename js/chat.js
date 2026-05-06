@@ -177,6 +177,7 @@ class ZenithAIChat {
         this.isRecording = false;
         this._speakingId = null;
         this.chatMode = localStorage.getItem('zenithChatMode') || 'expert';
+        this._openerDone = false;
     }
 
     setModel(id) {
@@ -184,11 +185,34 @@ class ZenithAIChat {
         localStorage.setItem('groqModel', id);
     }
 
+    setMode(id) {
+        const wasIntime = this.chatMode === 'intime';
+        this.chatMode = id;
+        localStorage.setItem('zenithChatMode', id);
+
+        // Quitter Intime : supprimer l'accroche auto si aucun message utilisateur
+        if (wasIntime && id !== 'intime') {
+            const onlyOpener = this.history.length > 0 && this.history.every(m => m.role === 'assistant');
+            if (onlyOpener) {
+                this.history = [];
+                this._openerDone = false;
+            }
+        }
+
+        // Entrer en Intime sur une conversation vide : lancer l'opener
+        if (id === 'intime' && !this.history.length) {
+            this._openerDone = false;
+        }
+
+        this._render();
+    }
+
     // ---- Gestion des conversations ----
     newConversation() {
         this.history  = [];
         this.convId   = this._uid();
         this.convName = null;
+        this._openerDone = false;
         this._render();
         this.renderSidebar();
     }
@@ -241,9 +265,37 @@ class ZenithAIChat {
         } catch { /* silencieux */ }
     }
 
-    setMode(id) {
-        this.chatMode = id;
-        localStorage.setItem('zenithChatMode', id);
+    // ---- Opener automatique en mode Intime ----
+    async _generateIntimateOpener() {
+        const key = this.keys.getAndAdvance();
+        if (!key) return;
+        const firstName = this._extractFirstName();
+        const instruction = firstName
+            ? `Tu prends contact pour la première fois avec ${firstName}. Lance la conversation avec UNE phrase naturelle et spontanée, 15 mots max. Juste la phrase, rien d'autre.`
+            : `Lance la conversation avec UNE phrase naturelle et spontanée, 15 mots max. Juste la phrase, rien d'autre.`;
+        try {
+            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama-3.1-8b-instant',
+                    messages: [
+                        { role: 'system', content: this._buildSystemPrompt() },
+                        { role: 'user', content: instruction },
+                    ],
+                    max_tokens: 60,
+                    temperature: 1.0,
+                    stream: false,
+                }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const text = data.choices?.[0]?.message?.content?.trim();
+            if (text && !this.history.length) {
+                this.history.push({ role: 'assistant', content: text, id: this._uid() });
+                this._render();
+            }
+        } catch { /* silencieux */ }
     }
 
     // ---- Mémoire persistante ----
@@ -725,6 +777,14 @@ class ZenithAIChat {
                         <p class="chat-empty-sub">Ajoutez une clé Groq dans les <button class="inline-link" onclick="window.openSettings()">paramètres</button> pour commencer.</p>
                     </div>
                 `;
+            } else if (this.chatMode === 'intime') {
+                // En mode Intime, l'IA parle en premier pour poser le ton
+                if (!this._openerDone && !this.streaming) {
+                    this._openerDone = true;
+                    container.innerHTML = `<div class="chat-empty"><div class="typing-dots" style="margin:auto;padding:3rem 0"><span></span><span></span><span></span></div></div>`;
+                    this._generateIntimateOpener();
+                }
+                return;
             } else {
                 const suggs = this._getDynamicSuggestions();
                 const hasCal = !!(window.CalendarWidget?.ecalendarUrl && window.CalendarWidget?.events?.length);
