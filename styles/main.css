@@ -1579,7 +1579,9 @@ html, body {
     flex-shrink: 0;
     padding: 1rem max(1.5rem, calc((100% - 820px) / 2));
     padding-bottom: 1.25rem;
-    border-top: 1px solid rgba(255,255,255,0.07);
+    margin-top: -40px;
+    z-index: 10;
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -1591,9 +1593,187 @@ html, body {
     align-items: flex-end;
 }
 
+/* ===== SLASH COMMAND MESSAGE BUBBLE ===== */
+.msg-bubble-cmd {
+    background: rgba(122, 162, 247, 0.06) !important;
+    border: 1px solid rgba(122, 162, 247, 0.18) !important;
+}
+
+.msg-cmd-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(122, 162, 247, 0.15);
+    color: #7aa2f7;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.55rem;
+    border-radius: 6px;
+    margin-bottom: 0.45rem;
+}
+
+.msg-cmd-tag i {
+    font-size: 0.65rem;
+    opacity: 0.8;
+}
+
+.msg-cmd-args {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+    line-height: 1.45;
+}
+
+.msg-cmd-favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* ===== SLASH COMMAND PICKER ===== */
+.slash-picker {
+    background: rgba(18, 18, 28, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.slash-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.slash-picker-item:last-child { border-bottom: none; }
+
+.slash-picker-item.active,
+.slash-picker-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.slash-picker-cmd {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #7aa2f7;
+    flex-shrink: 0;
+    min-width: 5.5rem;
+}
+
+.slash-picker-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.slash-picker-hint {
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+    flex-shrink: 0;
+}
+
+.chat-mic-btn {
+    width: 44px; height: 44px;
+    border-radius: 13px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.chat-mic-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.05);
+}
+.chat-mic-btn.recording {
+    color: #ff4757;
+    border-color: rgba(255, 71, 87, 0.4);
+    background: rgba(255, 71, 87, 0.1);
+    animation: mic-pulse 1.5s infinite;
+}
+@keyframes mic-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+}
+
+.chat-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.chat-attachments:empty {
+    display: none;
+}
+.chat-attachment-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 0.3rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}
+.chat-attachment-chip .fa-file-alt {
+    color: var(--accent-color);
+}
+.chat-attachment-del {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.2rem;
+}
+.chat-attachment-del:hover {
+    color: #ff4757;
+}
+
+.chat-dropzone {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 12, 22, 0.8);
+    border: 2px dashed var(--accent-color);
+    border-radius: 16px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    font-size: 1.1rem;
+    color: var(--accent-color);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    margin: 1rem max(1.5rem, calc((100% - 820px) / 2));
+    margin-bottom: 2.5rem;
+}
+.chat-dropzone.active {
+    opacity: 1;
+}
+
 .chat-textarea {
     flex: 1;
-    background: rgba(255,255,255,0.07);
+    background: #191924;
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 16px;
     padding: 0.8rem 1rem;
@@ -1614,7 +1794,7 @@ html, body {
 .chat-textarea::placeholder { color: var(--text-tertiary); }
 .chat-textarea:focus {
     border-color: var(--accent-color);
-    background: rgba(255,255,255,0.09);
+    background: #1f1f2e;
 }
 
 .chat-send-btn {
@@ -1695,3 +1875,211 @@ html, body {
     display: flex;
     gap: 0.5rem;
 }
+
+/* ===== MESSAGE HOVER BUTTONS ===== */
+/* ===== MESSAGE WRAPPER & HOVER BUTTONS ===== */
+.chat-msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-width: 820px;
+    width: 100%;
+}
+.chat-msg-wrapper-user {
+    align-self: flex-end;
+}
+.chat-msg-wrapper-ai {
+    align-self: flex-start;
+}
+
+.msg-hover-buttons {
+    display: flex;
+    gap: 0.4rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    align-items: center;
+}
+
+.user-hover {
+    justify-content: flex-end;
+    margin-right: 0.5rem;
+}
+
+.ai-hover {
+    justify-content: flex-start;
+    margin-left: 0.5rem;
+}
+
+.chat-msg-wrapper:hover .msg-hover-buttons {
+    opacity: 1;
+}
+
+.msg-hover-btn {
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    padding: 0.2rem;
+}
+
+.msg-hover-btn:hover {
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+.msg-hover-btn.copied {
+    color: var(--accent-color);
+}
+
+/* ===== MESSAGE EDIT INTERFACE ===== */
+.msg-edit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.msg-edit-textarea {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 0.7rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+}
+
+.msg-edit-textarea:focus {
+    border-color: var(--accent-color);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.msg-edit-save, .msg-edit-cancel {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.msg-edit-save {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+    font-weight: 500;
+}
+
+.msg-edit-save:hover {
+    background: rgba(92, 98, 255, 0.9);
+    box-shadow: 0 0 20px rgba(92, 98, 255, 0.3);
+}
+
+.msg-edit-cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ===== CODE BLOCK IMPROVEMENTS ===== */
+.code-block-wrapper {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin: 0.5rem 0;
+    overflow: hidden;
+    position: relative;
+    padding: 1rem 1rem 1rem 1.5rem; /* added left padding so it's not glued */
+}
+
+/* code block header removed */
+
+.code-copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.3rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+}
+
+.code-block-wrapper:hover .code-copy-btn {
+    opacity: 1;
+}
+
+.code-copy-btn:hover {
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+.code-copy-btn.copied {
+    color: var(--accent-color);
+}
+
+.code-block {
+    overflow-x: auto;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.code-block code {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+/* Ensure code blocks inside message bodies are updated */
+.ai-body .code-block {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ai-body .code-block-wrapper {
+    margin: 0.75rem 0;
+}
+
+.msg-body .code-block {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.msg-body .code-block-wrapper {
+    margin: 0.75rem 0;
+}
+
+/* ===== HIGHLIGHT.JS THEME OVERRIDE (for consistency) ===== */
+.hljs {
+    background: transparent !important;
+    padding: 0 !important;
+    color: inherit;
+}
+
+.hljs-string { color: #9ece6a; }
+.hljs-number { color: #ff9e64; }
+.hljs-literal { color: #bb9af7; }
+.hljs-attr { color: #7aa2f7; }
+.hljs-title { color: #7aa2f7; }
+.hljs-tag { color: #f7768e; }
+.hljs-built_in { color: #bb9af7; }
+.hljs-keyword { color: #bb9af7; }

@@ -48,7 +48,7 @@ function initClock() {
 }
 
 // ---- Background (image locale/custom) ----
-const DEFAULT_BG_IMAGE_PATH = 'ChatGPT Image 5 mai 2026, 14_45_44.png';
+const DEFAULT_BG_IMAGE_PATH = 'assets/img/background.png';
 
 function loadBackground() {
     const bgEl = document.getElementById('backgroundImage');
@@ -291,7 +291,8 @@ function initChat() {
     const syncSendBtn = () => {
         if (!sendBtn || !textarea) return;
         const noKey = !window.ZenithAI?.keys.hasKeys();
-        sendBtn.disabled = textarea.value.trim() === '' || window.ZenithAI?.streaming || noKey;
+        const hasAttachments = (window.ZenithAI?.attachments?.length || 0) > 0;
+        sendBtn.disabled = (textarea.value.trim() === '' && !hasAttachments) || window.ZenithAI?.streaming || noKey;
         sendBtn.title = noKey ? 'Ajoutez une clé API dans les paramètres' : '';
     };
 
@@ -304,7 +305,8 @@ function initChat() {
 
     const doSend = () => {
         const text = textarea?.value.trim();
-        if (!text || window.ZenithAI?.streaming) return;
+        const hasAttachments = (window.ZenithAI?.attachments?.length || 0) > 0;
+        if ((!text && !hasAttachments) || window.ZenithAI?.streaming) return;
         window.ZenithAI?.send(text);
         if (textarea) { textarea.value = ''; textarea.style.height = 'auto'; }
         syncSendBtn();

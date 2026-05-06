@@ -17,6 +17,9 @@
 
     <!-- GSAP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/tokyo-night-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
 </head>
 <body>
 
@@ -150,12 +153,17 @@
             <div class="chat-messages" id="chatMessages"></div>
 
             <!-- Input -->
-            <div class="chat-input-area">
+            <div class="chat-input-area" id="chatInputArea">
+                <div id="chatDropZone" class="chat-dropzone">Goutte tes fichiers ici</div>
+                <div id="chatAttachments" class="chat-attachments"></div>
                 <div class="chat-input-wrapper">
+                    <button class="chat-mic-btn" id="chatMicBtn" title="Saisie vocale">
+                        <i class="fas fa-microphone"></i>
+                    </button>
                     <textarea
                         id="chatInput"
                         class="chat-textarea"
-                        placeholder="Posez votre question..."
+                        placeholder="Posez votre question ou glissez un fichier..."
                         rows="1"
                     ></textarea>
                     <button class="chat-send-btn" id="chatSendBtn" disabled>

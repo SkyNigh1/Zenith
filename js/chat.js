@@ -122,6 +122,9 @@ class ZenithAIChat {
         this.streaming = false;
         this.convId   = null;
         this.convName = null;
+        this.attachments = [];
+        this.recognition = null;
+        this.isRecording = false;
     }
 
     setModel(id) {
@@ -186,6 +189,132 @@ class ZenithAIChat {
         } catch { /* silencieux */ }
     }
 
+    // ---- Prompt système dynamique avec contexte calendrier ----
+    _buildSystemPrompt() {
+        const cal = window.CalendarWidget;
+        if (!cal?.ecalendarUrl || !cal.events?.length) return SYSTEM_PROMPT;
+
+        const today = new Date();
+        const todayStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const upcoming = cal.getUpcomingEvents(5);
+        if (!upcoming.length) return SYSTEM_PROMPT;
+
+        const eventsText = upcoming.map(e => {
+            const isToday = e.start.toDateString() === today.toDateString();
+            const dateStr = isToday ? "aujourd'hui" : e.start.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+            const hasTime = e.start.getHours() || e.start.getMinutes();
+            const timeStr = hasTime
+                ? `${String(e.start.getHours()).padStart(2, '0')}:${String(e.start.getMinutes()).padStart(2, '0')}`
+                : 'toute la journée';
+            return `- ${e.title} (${dateStr}, ${timeStr}${e.location ? ', ' + e.location : ''})`;
+        }).join('\n');
+
+        return `${SYSTEM_PROMPT}\n\nAgenda de l'utilisateur — prochains événements :\n${eventsText}\nDate du jour : ${todayStr}.`;
+    }
+
+    // ---- Contexte détaillé pour /planning ----
+    _buildPlanningContext() {
+        const cal = window.CalendarWidget;
+        if (!cal?.ecalendarUrl) return null;
+
+        const upcoming = cal.getUpcomingEvents(10);
+        const today = new Date();
+        const todayStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        if (!upcoming.length) return `Aucun événement à venir dans mon calendrier (${todayStr}).`;
+
+        const lines = upcoming.map(e => {
+            const isToday = e.start.toDateString() === today.toDateString();
+            const dateStr = isToday ? "Aujourd'hui" : e.start.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+            const hasTime = e.start.getHours() || e.start.getMinutes();
+            const timeStr = hasTime
+                ? `${String(e.start.getHours()).padStart(2, '0')}:${String(e.start.getMinutes()).padStart(2, '0')}`
+                : 'toute la journée';
+            return `- ${dateStr} : ${e.title} à ${timeStr}${e.location ? ' (' + e.location + ')' : ''}`;
+        });
+
+        return `Voici mes prochains événements (aujourd'hui : ${todayStr}) :\n${lines.join('\n')}`;
+    }
+
+    // ---- Gestion des commandes slash ----
+    async _handleSlashCommand(text) {
+        const lower = text.toLowerCase();
+
+        if (lower.startsWith('/traduis')) {
+            const args = text.slice('/traduis'.length).trim();
+            return args
+                ? `Traduis ce texte. Réponds uniquement avec la traduction, sans commentaire :\n\n${args}`
+                : 'Aide-moi à traduire quelque chose. Dis-moi ce que tu veux traduire et vers quelle langue.';
+        }
+
+        if (lower.startsWith('/code')) {
+            const args = text.slice('/code'.length).trim();
+            return args
+                ? `Génère du code pour : ${args}\n\nFournis du code propre et fonctionnel avec de brèves explications si nécessaire.`
+                : 'Aide-moi à écrire du code. Décris ce que tu veux.';
+        }
+
+        if (lower.startsWith('/résume') || lower.startsWith('/resume')) {
+            const cmdLen = lower.startsWith('/résume') ? '/résume'.length : '/resume'.length;
+            const args = text.slice(cmdLen).trim();
+
+            if (!args) return "Présente cette conversation à quelqu'un qui ne la connaît pas : de quoi s'agit-il, quel est le sujet central, qu'est-ce qui en ressort d'essentiel ?";
+
+            if (/^https?:\/\//i.test(args)) {
+                const content = await this._fetchUrlContent(args);
+                return content
+                    ? `Tu viens de visiter ce site pour la première fois. Explique-le à quelqu'un qui ne le connaît pas du tout : à quoi sert-il, qui est derrière, dans quel domaine, à qui s'adresse-t-il, quel est son objectif principal ? Réponds de façon naturelle et directe, sans liste à puces.\n\nSource : ${args}\n\n${content}`
+                    : `INSTRUCTION STRICTE : tu n'as pas pu accéder au contenu de cette URL. Réponds UNIQUEMENT ceci, mot pour mot, sans rien ajouter ni inventer : "Je n'ai pas pu lire le contenu de ce site. Essaie de copier-coller le texte directement dans le chat."</s>`;
+            }
+
+            return `Explique ce contenu à quelqu'un qui ne le connaît pas : de quoi s'agit-il, dans quel domaine, quel est l'objectif, à qui ça s'adresse ? Réponds de façon naturelle et directe, sans liste à puces.\n\n${args}`;
+        }
+
+        if (lower.startsWith('/planning')) {
+            const ctx = this._buildPlanningContext();
+            return ctx
+                ? `${ctx}\n\nAnalyse mon planning et donne-moi un aperçu concis de ma semaine.`
+                : 'Aucun calendrier configuré. Ajoutez un lien ICS dans les paramètres pour accéder à votre planning.';
+        }
+
+        return undefined; // commande inconnue → texte traité normalement
+    }
+
+    // ---- Fetch contenu d'une URL via proxy CORS ----
+    async _fetchUrlContent(url) {
+        const proxies = [
+            u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+            u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+            u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+            u => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(u)}`,
+        ];
+        for (const proxyFn of proxies) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 8000);
+                const res = await fetch(proxyFn(url), { signal: ctrl.signal });
+                clearTimeout(timer);
+                if (!res.ok) continue;
+                const html = await res.text();
+                // Vérifie que la réponse ressemble à du HTML et pas à une erreur proxy
+                if (!html.includes('<') && html.length < 200) continue;
+                const text = html
+                    .replace(/<script[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[\s\S]*?<\/style>/gi, '')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .slice(0, 8000);
+                if (text.length > 100) return text;
+            } catch { continue; }
+        }
+        return null;
+    }
+
     async renderSidebar() {
         const list = document.getElementById('convList');
         if (!list) return;
@@ -217,8 +346,10 @@ class ZenithAIChat {
 
     // ---- Envoi d'un message ----
     async send(text) {
-        text = text.trim();
-        if (!text || this.streaming) return;
+        text = text ? text.trim() : '';
+        const hasAttachments = this.attachments.length > 0;
+        
+        if ((!text && !hasAttachments) || this.streaming) return;
 
         if (!this.keys.hasKeys()) {
             this._render();
@@ -228,18 +359,52 @@ class ZenithAIChat {
         const isFirst = this.history.length === 0;
         if (!this.convId) this.convId = this._uid();
 
+        let finalContent = text;
+        if (hasAttachments) {
+            const filesCtx = this.attachments.map(a => `\n\n--- FICHIER: ${a.name} ---\n\`\`\`\n${a.content}\n\`\`\`\n`).join('');
+            finalContent = (text ? text + '\n' : '') + filesCtx;
+            this.attachments = [];
+            this._renderAttachments();
+        }
+
         // Message utilisateur
-        this.history.push({ role: 'user', content: text, id: this._uid() });
+        const userMsg = { role: 'user', content: finalContent, id: this._uid() };
+        this.history.push(userMsg);
         this._render();
         this._scrollBottom();
 
-        // Nommer la conv sur le 1er message (concurrent, non-bloquant)
         if (isFirst) this._autoName(text);
 
-        // Placeholder assistant
+        // Commandes slash : transforme le contenu envoyé à l'API (async pour /résume URL)
+        if (text.startsWith('/') && !hasAttachments) {
+            const tempId = this._uid();
+            this.history.push({ role: 'assistant', content: '', id: tempId, streaming: true });
+            this._render();
+
+            const apiContent = await this._handleSlashCommand(text);
+            if (apiContent !== undefined) {
+                userMsg.apiContent = apiContent;
+                // Stocker la commande séparément pour l'affichage
+                const spaceIdx = text.indexOf(' ');
+                userMsg.slashCmd  = spaceIdx === -1 ? text : text.slice(0, spaceIdx);
+                userMsg.slashArgs = spaceIdx === -1 ? '' : text.slice(spaceIdx + 1).trim();
+                this._render(); // re-rendre maintenant qu'on a slashCmd
+            }
+
+            this.history = this.history.filter(m => m.id !== tempId);
+        }
+
+        await this._requestAIResponse();
+    }
+
+    // ---- Déclenche une réponse AI sans ajouter de msg utilisateur ----
+    async _requestAIResponse() {
+        if (!this.keys.hasKeys() || this.streaming) return;
+
         const aiId = this._uid();
         this.history.push({ role: 'assistant', content: '', id: aiId, streaming: true });
         this._render();
+        this._scrollBottom();
 
         this.streaming = true;
         try {
@@ -260,10 +425,10 @@ class ZenithAIChat {
 
         // Construction du contexte (sans le placeholder vide)
         const apiMessages = [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: this._buildSystemPrompt() },
             ...this.history
                 .filter(m => !(m.id === aiId && m.content === ''))
-                .map(m => ({ role: m.role, content: m.content }))
+                .map(m => ({ role: m.role, content: m.apiContent || m.content }))
         ];
 
         let res;
@@ -346,6 +511,29 @@ class ZenithAIChat {
         }
     }
 
+    _getDynamicSuggestions() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) {
+            return [
+                "Quel est mon programme aujourd'hui ?",
+                "Résume l'actualité tech de la veille",
+                "Donne-moi une citation motivante"
+            ];
+        } else if (hour >= 12 && hour < 18) {
+            return [
+                "Aide-moi à rédiger un email",
+                "Explique-moi un concept complexe",
+                "Génère du code pour une fonction"
+            ];
+        } else {
+            return [
+                "Résume ma journée",
+                "Propose-moi un sujet de lecture relaxant",
+                "Qu'est-ce qu'on peut apprendre ce soir ?"
+            ];
+        }
+    }
+
     // ---- Rendu complet des messages ----
     _render() {
         const container = document.getElementById('chatMessages');
@@ -361,14 +549,17 @@ class ZenithAIChat {
                     </div>
                 `;
             } else {
+                const suggs = this._getDynamicSuggestions();
+                const hasCal = !!(window.CalendarWidget?.ecalendarUrl && window.CalendarWidget?.events?.length);
                 container.innerHTML = `
                     <div class="chat-empty">
                         <div class="chat-empty-star">✦</div>
                         <p class="chat-empty-text">Bonjour, comment puis-je vous aider ?</p>
                         <div class="chat-suggestions" id="chatSuggestions">
-                            <button class="chat-suggestion-chip">Résume les actualités tech d'aujourd'hui</button>
-                            <button class="chat-suggestion-chip">Explique-moi un concept en IA</button>
-                            <button class="chat-suggestion-chip">Écris un email professionnel</button>
+                            ${hasCal ? `<button class="chat-suggestion-chip" data-cmd="/planning"><i class="fas fa-calendar-alt"></i> Mon planning</button>` : ''}
+                            <button class="chat-suggestion-chip">${suggs[0]}</button>
+                            <button class="chat-suggestion-chip">${suggs[1]}</button>
+                            <button class="chat-suggestion-chip">${suggs[2]}</button>
                         </div>
                     </div>
                 `;
@@ -377,7 +568,7 @@ class ZenithAIChat {
             return;
         }
 
-        container.innerHTML = this.history.map(msg => {
+        container.innerHTML = this.history.map((msg, idx) => {
             const isUser = msg.role === 'user';
             let bodyHtml;
             if (msg.streaming && msg.content === '') {
@@ -389,18 +580,246 @@ class ZenithAIChat {
             }
 
             if (isUser) {
-                return `<div class="chat-msg chat-msg-user" data-msg="${msg.id}">
-                    <div class="msg-bubble msg-bubble-user">
-                        <div class="msg-body">${this._escText(msg.content)}</div>
+                let userBodyHtml;
+                if (msg.slashCmd) {
+                    const cmdName = msg.slashCmd.slice(1); // sans le /
+                    const isUrl = /^https?:\/\//i.test(msg.slashArgs);
+                    const argsHtml = msg.slashArgs
+                        ? `<div class="msg-cmd-args">
+                               ${isUrl ? `<img class="msg-cmd-favicon" data-url="${this._esc(msg.slashArgs)}" alt="">` : ''}
+                               <span>${this._escText(msg.slashArgs)}</span>
+                           </div>`
+                        : '';
+                    userBodyHtml = `
+                        <div class="msg-cmd-tag">
+                            <i class="fas fa-terminal"></i>
+                            <span>${this._esc(cmdName)}</span>
+                        </div>
+                        ${argsHtml}
+                    `;
+                } else {
+                    userBodyHtml = this._escText(msg.content);
+                }
+                return `<div class="chat-msg-wrapper chat-msg-wrapper-user">
+                    <div class="chat-msg chat-msg-user" data-msg="${msg.id}">
+                        <div class="msg-bubble msg-bubble-user${msg.slashCmd ? ' msg-bubble-cmd' : ''}">
+                            <div class="msg-body">${userBodyHtml}</div>
+                        </div>
+                    </div>
+                    <div class="msg-hover-buttons user-hover">
+                        <button class="msg-hover-btn msg-edit-btn" title="Modifier" data-msg="${msg.id}">
+                            <i class="fas fa-pencil"></i>
+                        </button>
+                        <button class="msg-hover-btn msg-copy-btn" title="Copier" data-msg="${msg.id}">
+                            <i class="fas fa-copy"></i>
+                        </button>
                     </div>
                 </div>`;
             }
-            return `<div class="chat-msg chat-msg-ai" data-msg="${msg.id}">
-                <div class="msg-body ai-body${msg.error ? ' ai-error' : ''}">${bodyHtml}</div>
+
+            // Check if this is the last message and it's from AI (for retry button)
+            const isLastMessage = idx === this.history.length - 1;
+            const showRetryBtn = isLastMessage && !msg.streaming;
+
+            return `<div class="chat-msg-wrapper chat-msg-wrapper-ai">
+                <div class="chat-msg chat-msg-ai" data-msg="${msg.id}">
+                    <div class="msg-body ai-body${msg.error ? ' ai-error' : ''}">${bodyHtml}</div>
+                </div>
+                <div class="msg-hover-buttons ai-hover">
+                    <button class="msg-hover-btn msg-copy-btn" title="Copier" data-msg="${msg.id}">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    ${showRetryBtn ? `<button class="msg-hover-btn msg-retry-btn" title="Réessayer" data-msg="${msg.id}">
+                        <i class="fas fa-sync"></i>
+                    </button>` : ''}
+                </div>
             </div>`;
         }).join('');
 
+        // Bind message hover button events
+        this._bindMessageButtons();
+        this._bindFavicons();
         this._scrollBottom();
+    }
+
+    _bindFavicons() {
+        document.querySelectorAll('.msg-cmd-favicon').forEach(img => {
+            if (img._bound) return;
+            img._bound = true;
+            const url = img.dataset.url;
+            if (!url) return;
+            try {
+                const { hostname } = new URL(url);
+                const fallbacks = [
+                    `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`,
+                    `https://${hostname}/favicon.ico`,
+                    `https://logo.clearbit.com/${hostname}`,
+                ];
+                let idx = 0;
+                const tryNext = () => {
+                    if (idx < fallbacks.length) { img.src = fallbacks[idx++]; }
+                    else { img.style.display = 'none'; }
+                };
+                img.onerror = tryNext;
+                img.onload = () => {
+                    if (img.naturalWidth <= 16 && img.naturalHeight <= 16) tryNext();
+                };
+                tryNext();
+            } catch { img.style.display = 'none'; }
+        });
+    }
+
+    _bindMessageButtons() {
+        // Copy buttons
+        document.querySelectorAll('.msg-copy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const msgId = btn.dataset.msg;
+                const msg = this.history.find(m => m.id === msgId);
+                if (msg) {
+                    this._copyToClipboard(msg.content);
+                    this._showCopyFeedback(btn);
+                }
+            });
+        });
+
+        // Edit buttons (user messages)
+        document.querySelectorAll('.msg-edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const msgId = btn.dataset.msg;
+                const msg = this.history.find(m => m.id === msgId);
+                if (msg) {
+                    this._editMessage(msgId, msg.content);
+                }
+            });
+        });
+
+        // Retry buttons (AI messages)
+        document.querySelectorAll('.msg-retry-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const msgId = btn.dataset.msg;
+                this._retryMessage(msgId);
+            });
+        });
+
+        // Code block copy buttons
+        document.querySelectorAll('.code-copy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const codeBlock = btn.closest('.code-block-wrapper')?.querySelector('code');
+                if (codeBlock) {
+                    const code = codeBlock.textContent;
+                    this._copyToClipboard(code);
+                    this._showCopyFeedback(btn);
+                }
+            });
+        });
+    }
+
+    _editMessage(msgId, content) {
+        const msgEl = document.querySelector(`[data-msg="${msgId}"]`);
+        if (!msgEl) return;
+
+        const msgBody = msgEl.querySelector('.msg-body');
+        const originalHtml = msgBody.innerHTML;
+
+        // Create an editable textarea
+        const textarea = document.createElement('textarea');
+        textarea.className = 'msg-edit-textarea';
+        textarea.value = content;
+        textarea.focus();
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'msg-edit-save';
+        saveBtn.textContent = 'Envoyer';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'msg-edit-cancel';
+        cancelBtn.textContent = 'Annuler';
+
+        const editContainer = document.createElement('div');
+        editContainer.className = 'msg-edit-container';
+        editContainer.appendChild(textarea);
+        editContainer.appendChild(saveBtn);
+        editContainer.appendChild(cancelBtn);
+
+        msgBody.innerHTML = '';
+        msgBody.appendChild(editContainer);
+
+        const handleSave = async () => {
+            const newText = textarea.value.trim();
+            if (!newText) {
+                msgBody.innerHTML = originalHtml;
+                return;
+            }
+
+            // Find this message's index
+            const msgIndex = this.history.findIndex(m => m.id === msgId);
+            if (msgIndex === -1) return;
+
+            // Delete all messages after this user message
+            this.history = this.history.slice(0, msgIndex + 1);
+
+            // Update the message content in place
+            const msg = this.history[msgIndex];
+            msg.content = newText;
+
+            this._render();
+            await this._requestAIResponse();
+        };
+
+        const handleCancel = () => {
+            msgBody.innerHTML = originalHtml;
+        };
+
+        saveBtn.addEventListener('click', handleSave);
+        cancelBtn.addEventListener('click', handleCancel);
+
+        // Allow Enter+Ctrl to save
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                handleSave();
+            } else if (e.key === 'Escape') {
+                handleCancel();
+            }
+        });
+    }
+
+    async _retryMessage(msgId) {
+        // Find the AI message
+        const msgIndex = this.history.findIndex(m => m.id === msgId);
+        if (msgIndex === -1) return;
+
+        // Find the last user message before this AI message
+        let lastUserMsg = null;
+        for (let i = msgIndex - 1; i >= 0; i--) {
+            if (this.history[i].role === 'user') {
+                lastUserMsg = this.history[i];
+                break;
+            }
+        }
+
+        if (!lastUserMsg) return;
+
+        // Remove the AI message and regenerate without re-adding the user message
+        this.history.splice(msgIndex, 1);
+
+        await this._requestAIResponse();
+    }
+
+    _copyToClipboard(text) {
+        navigator.clipboard.writeText(text).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+
+    _showCopyFeedback(btn) {
+        const originalTitle = btn.title;
+        btn.title = 'Copié!';
+        btn.classList.add('copied');
+
+        setTimeout(() => {
+            btn.title = originalTitle;
+            btn.classList.remove('copied');
+        }, 2000);
     }
 
     _appendError(html) {
@@ -423,25 +842,37 @@ class ZenithAIChat {
             btn.addEventListener('click', () => {
                 const input = document.getElementById('chatInput');
                 const sendBtn = document.getElementById('chatSendBtn');
+                const text = btn.dataset.cmd || btn.textContent.trim();
                 if (input) {
-                    input.value = btn.textContent;
-                    input.dispatchEvent(new Event('input')); // déclenche syncSendBtn
+                    input.value = text;
+                    input.dispatchEvent(new Event('input'));
                 }
-                sendBtn?.click(); // passe par doSend qui vide le textarea après envoi
+                sendBtn?.click();
             });
         });
     }
 
-    // ---- Rendu Markdown ----
+    // ---- Rendu Markdown avec code blocks améliorés ----
     _md(text) {
         if (!text) return '';
 
         // 1. Extraire les blocs de code pour les protéger
         const blocks = [];
         text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
-            const i = blocks.length;
-            blocks.push(`<pre class="code-block">${lang ? `<span class="code-lang">${this._esc(lang)}</span>` : ''}<code>${this._esc(code.trim())}</code></pre>`);
-            return `\x00BLOCK${i}\x00`;
+            const cleanCode = code.trim();
+            const langAttr = lang ? ` language-${this._esc(lang)}` : '';
+            const langDisplay = lang ? `<span class="code-lang">${this._esc(lang)}</span>` : '';
+            
+            // Create code block with copy button
+            const blockHtml = `<div class="code-block-wrapper" style="position: relative;">
+                <button class="code-copy-btn" title="Copier le code">
+                    <i class="fas fa-copy"></i>
+                </button>
+                <pre class="code-block"><code class="hljs${langAttr}">${this._esc(cleanCode)}</code></pre>
+            </div>`;
+            
+            blocks.push(blockHtml);
+            return `\x00BLOCK${blocks.length - 1}\x00`;
         });
 
         // 2. Parser ligne par ligne
@@ -517,6 +948,16 @@ class ZenithAIChat {
         }
 
         closeLists();
+        
+        // Apply highlight.js after rendering
+        setTimeout(() => {
+            if (window.hljs) {
+                document.querySelectorAll('pre code.hljs').forEach(block => {
+                    window.hljs.highlightElement(block);
+                });
+            }
+        }, 0);
+
         return out.join('');
     }
 
@@ -534,6 +975,265 @@ class ZenithAIChat {
     _esc(s)    { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     _escText(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
     _uid()     { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+
+    // ===== ADVANCED UX (Mic, Drag/Drop, Slash picker) =====
+    _initAdvancedUX() {
+        this._initVoice();
+        this._initDragAndDrop();
+        this._initSlashPicker();
+    }
+
+    _initSlashPicker() {
+        const input = document.getElementById('chatInput');
+        if (!input) return;
+
+        const COMMANDS = [
+            { cmd: '/traduis', desc: 'Traduit un texte vers une autre langue',   hint: '/traduis Bonjour → Hello' },
+            { cmd: '/résume',  desc: 'Résume un texte ou une page web (URL)',     hint: '/résume https://...' },
+            { cmd: '/code',    desc: 'Génère du code à partir d\'une description', hint: '/code une fonction qui...' },
+            { cmd: '/planning',desc: 'Analyse ton agenda de la semaine',           hint: '' },
+        ];
+
+        const picker = document.createElement('div');
+        picker.className = 'slash-picker';
+        picker.hidden = true;
+        input.closest('.chat-input-area').insertBefore(picker, input.closest('.chat-input-wrapper'));
+
+        let activeIdx = 0;
+        let filtered = [];
+
+        const render = () => {
+            picker.innerHTML = filtered.map((c, i) => `
+                <div class="slash-picker-item${i === activeIdx ? ' active' : ''}" data-i="${i}">
+                    <span class="slash-picker-cmd">${c.cmd}</span>
+                    <span class="slash-picker-desc">${c.desc}</span>
+                    ${c.hint ? `<span class="slash-picker-hint">${c.hint}</span>` : ''}
+                </div>
+            `).join('');
+            picker.querySelectorAll('.slash-picker-item').forEach(item => {
+                item.addEventListener('mouseenter', () => {
+                    activeIdx = +item.dataset.i;
+                    render();
+                });
+                item.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    confirm(+item.dataset.i);
+                });
+            });
+        };
+
+        const show = (list) => {
+            filtered = list;
+            activeIdx = 0;
+            picker.hidden = false;
+            render();
+        };
+
+        const hide = () => { picker.hidden = true; filtered = []; };
+
+        const confirm = (i) => {
+            const c = filtered[i];
+            if (!c) return;
+            input.value = c.cmd + ' ';
+            input.dispatchEvent(new Event('input'));
+            input.focus();
+            hide();
+        };
+
+        input.addEventListener('input', () => {
+            const val = input.value;
+            // Affiche le picker seulement si le texte commence par / sans espace
+            if (!val.startsWith('/') || val.includes(' ')) { hide(); return; }
+            const q = val.toLowerCase();
+            const list = COMMANDS.filter(c => c.cmd.startsWith(q));
+            list.length ? show(list) : hide();
+        });
+
+        input.addEventListener('keydown', e => {
+            if (picker.hidden) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIdx = (activeIdx + 1) % filtered.length;
+                render();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIdx = (activeIdx - 1 + filtered.length) % filtered.length;
+                render();
+            } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                e.preventDefault();
+                e.stopImmediatePropagation(); // empêche doSend() dans app.js
+                confirm(activeIdx);
+            } else if (e.key === 'Escape') {
+                hide();
+            }
+        });
+
+        input.addEventListener('blur', () => setTimeout(hide, 120));
+    }
+
+    _initVoice() {
+        const btn = document.getElementById('chatMicBtn');
+        const input = document.getElementById('chatInput');
+        if (!btn || !input) return;
+
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+            btn.disabled = true;
+            btn.title = 'Micro non supporté par ce navigateur';
+            btn.style.opacity = '0.35';
+            btn.style.cursor = 'not-allowed';
+            return;
+        }
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        const startRecording = async () => {
+            if (!this.keys.hasKeys()) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioChunks = [];
+
+                // Choisit un format supporté par le navigateur
+                const mimeType = ['audio/webm', 'audio/ogg', 'audio/mp4']
+                    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    this.isRecording = false;
+                    btn.classList.remove('recording');
+                    btn.title = 'Saisie vocale';
+
+                    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                    await this._transcribeAudio(blob, input);
+                };
+
+                mediaRecorder.start();
+                this.isRecording = true;
+                btn.classList.add('recording');
+                btn.title = 'Cliquez pour arrêter';
+            } catch (err) {
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    btn.disabled = true;
+                    btn.title = 'Permission micro refusée — autorisez le micro dans les paramètres du navigateur';
+                    btn.style.opacity = '0.35';
+                    btn.style.cursor = 'not-allowed';
+                }
+            }
+        };
+
+        btn.addEventListener('click', () => {
+            if (this.isRecording && mediaRecorder?.state === 'recording') {
+                mediaRecorder.stop();
+            } else {
+                startRecording();
+            }
+        });
+    }
+
+    async _transcribeAudio(blob, input) {
+        const btn = document.getElementById('chatMicBtn');
+        const key = this.keys.getAndAdvance();
+        if (!key) return;
+
+        if (btn) { btn.style.opacity = '0.5'; btn.title = 'Transcription…'; }
+
+        try {
+            // Groq impose une extension reconnue dans le nom du fichier
+            const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+            const formData = new FormData();
+            formData.append('file', blob, `audio.${ext}`);
+            formData.append('model', 'whisper-large-v3-turbo');
+            formData.append('response_format', 'json');
+
+            const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${key}` },
+                body: formData,
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const text = data.text?.trim();
+                if (text) {
+                    const sep = input.value && !input.value.endsWith(' ') ? ' ' : '';
+                    input.value += sep + text;
+                    input.dispatchEvent(new Event('input'));
+                    input.focus();
+                }
+            }
+        } catch { /* réseau indispo, on ignore */ }
+
+        if (btn) { btn.style.opacity = ''; btn.title = 'Saisie vocale'; }
+    }
+
+    _initDragAndDrop() {
+        const area = document.getElementById('chatInputArea');
+        const dropzone = document.getElementById('chatDropZone');
+        if (!area || !dropzone) return;
+
+        area.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('active');
+        });
+
+        area.addEventListener('dragleave', (e) => {
+            if (e.relatedTarget && area.contains(e.relatedTarget)) return;
+            dropzone.classList.remove('active');
+        });
+
+        area.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('active');
+            
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const files = Array.from(e.dataTransfer.files);
+                for (const fl of files) {
+                    if (fl.size > 5000000) {
+                        alert('Fichier trop grand (limite 5Mo)');
+                        continue;
+                    }
+                    try {
+                        const text = await fl.text();
+                        this.attachments.push({ name: fl.name, content: text, id: this._uid() });
+                    } catch {
+                        alert('Impossible de lire le texte de ce fichier.');
+                    }
+                }
+                this._renderAttachments();
+            }
+        });
+    }
+
+    _renderAttachments() {
+        const container = document.getElementById('chatAttachments');
+        if (!container) return;
+        
+        container.innerHTML = this.attachments.map(att => `
+            <div class="chat-attachment-chip">
+                <i class="fas fa-file-alt"></i>
+                <span class="attachment-name">${this._esc(att.name)}</span>
+                <button class="chat-attachment-del" data-id="${att.id}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+
+        container.querySelectorAll('.chat-attachment-del').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.attachments = this.attachments.filter(a => a.id !== btn.dataset.id);
+                this._renderAttachments();
+            });
+        });
+
+        // Trigger input event to update the send button state
+        const textarea = document.getElementById('chatInput');
+        if (textarea) textarea.dispatchEvent(new Event('input'));
+    }
 }
 
 // ===== Export global =====
@@ -592,4 +1292,9 @@ async function loadGroqModels() {
 // Expose pour être rappelé depuis app.js quand une clé est ajoutée
 window.loadGroqModels = loadGroqModels;
 
-document.addEventListener('DOMContentLoaded', loadGroqModels);
+document.addEventListener('DOMContentLoaded', () => {
+    loadGroqModels();
+    if (window.ZenithAI) {
+        window.ZenithAI._initAdvancedUX();
+    }
+});
