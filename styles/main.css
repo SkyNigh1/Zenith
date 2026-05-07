@@ -1329,6 +1329,95 @@ html, body {
     border-radius: 9px !important;
 }
 
+/* ---- Key Usage Indicator ---- */
+.key-usage-wrapper {
+    position: relative;
+}
+
+.key-usage-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+}
+.key-usage-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+.key-usage-btn.warn  { color: #f59e0b; border-color: rgba(245,158,11,0.35); }
+.key-usage-btn.danger { color: #ef4444; border-color: rgba(239,68,68,0.35); }
+
+.key-usage-popup {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 260px;
+    background: #15152a;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 0.8rem;
+    z-index: 300;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.key-usage-popup.visible { display: block; }
+
+.key-usage-popup-title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-tertiary);
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.key-usage-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    margin-bottom: 0.6rem;
+}
+.key-usage-row:last-child { margin-bottom: 0; }
+
+.key-usage-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+.key-usage-name {
+    font-size: 0.7rem;
+    font-family: 'Courier New', monospace;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.key-usage-count {
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.key-usage-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.key-usage-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+.key-usage-empty {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 0.4rem 0;
+}
+
 /* ---- Zone messages ---- */
 .chat-messages {
     flex: 1;
