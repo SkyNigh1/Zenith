@@ -31,6 +31,14 @@ html, body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* ===== GLASS ROOT (conteneur pour les overlays LiquidGlass) ===== */
+#glass-root {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+}
+
 /* ===== BACKGROUND ===== */
 #backgroundImage {
     position: fixed;
@@ -76,26 +84,26 @@ html, body {
 }
 
 .right-panel {
-    /* Retiré le flex pour détacher controls et cal */
+    position: fixed;
+    top: 2.5rem;
+    right: 2.5rem;
     z-index: 10;
 }
 
 /* ===== TOP CONTROLS ===== */
 .top-controls {
-    position: fixed;
-    top: 2.5rem;
-    right: 2.5rem;
     display: flex;
     gap: 0.8rem;
-    z-index: 20;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
 }
 
 .ctrl-btn {
     width: 44px;
     height: 44px;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.15); /* Match new glass */
-    background: rgba(255, 255, 255, 0.06); /* Lighter glass */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     color: var(--text-secondary);
@@ -104,25 +112,19 @@ html, body {
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
+    transition: color 0.2s ease;
 }
-
-.ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-    border-color: rgba(255,255,255,0.25);
-}
+.ctrl-btn:hover { color: var(--text-primary); }
 
 /* ===== WEATHER WIDGET ===== */
 .weather-widget {
     width: 320px;
     padding: 1.8rem;
-    background: rgba(255, 255, 255, 0.06); /* Lighter glass */
+    background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* More visible border */
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
     border-radius: 20px;
 }
 
@@ -448,16 +450,13 @@ html, body {
 
 /* ===== CALENDAR WIDGET ===== */
 .calendar-widget {
-    position: fixed;
-    top: 6rem;
-    right: 2.5rem;
     width: 320px;
     padding: 1.8rem;
-    background: rgba(255, 255, 255, 0.06); /* Lighter glass */
+    background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* More visible border */
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
     border-radius: 20px;
 }
 
@@ -688,9 +687,14 @@ html, body {
 /* ===== SEARCH BAR ===== */
 .search-wrapper {
     width: 100%;
-    max-width: 1100px; /* Encore plus large pour s'étendre sur la page */
+    max-width: 1100px;
     pointer-events: auto;
     margin-bottom: 3.5rem;
+    border-radius: var(--radius-pill);
+    /* Fallback visible pendant le chargement de LiquidGlass */
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
 }
 
 .search-form {
@@ -700,28 +704,25 @@ html, body {
 
 .search-input {
     width: 100%;
-    padding: 1.3rem 3.5rem 1.3rem 4.2rem; /* Espace augmenté à gauche entre l'icône et le texte */
+    padding: 1.3rem 3.5rem 1.3rem 4.2rem;
     font-size: 1.15rem;
     font-family: 'Inter', sans-serif;
     font-weight: 300;
-    border: none;
-    border-radius: var(--radius-pill);
     outline: none;
-    background: rgba(255, 255, 255, 0.06); /* Lighter to see the glass clearly */
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* More visible border */
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-pill);
     color: var(--text-primary);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
-    transition: all 0.3s ease;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .search-input::placeholder { color: rgba(255, 255, 255, 0.5); }
 
 .search-input:focus {
-    background: rgba(255, 255, 255, 0.09);
     border-color: rgba(92, 98, 255, 0.6);
-    box-shadow: 0 16px 50px rgba(0,0,0,0.6), 0 0 0 3px rgba(92, 98, 255, 0.2);
+    box-shadow: 0 0 0 3px rgba(92, 98, 255, 0.2);
 }
 
 .search-icon-left {
@@ -765,6 +766,7 @@ html, body {
     flex-wrap: wrap;
     justify-content: center;
     max-width: 900px;
+    padding: 1.2rem 1.4rem;
 }
 
 .shortcuts-grid {
@@ -782,10 +784,9 @@ html, body {
     width: 110px;
     height: 110px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.06); /* Lighter glass */
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* More visible border */
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -794,15 +795,12 @@ html, body {
     text-decoration: none;
     cursor: pointer;
     position: relative;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
     transition: all 0.25s ease;
 }
 
 .shortcut-item:hover {
-    background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255,255,255,0.25);
     transform: translateY(-4px);
-    box-shadow: 0 16px 50px rgba(0,0,0,0.6);
 }
 
 .shortcut-icon-wrap {
@@ -853,17 +851,15 @@ html, body {
     width: 110px;
     height: 110px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.06); /* Lighter glass */
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15); /* More visible border */
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.6rem;
     cursor: pointer;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.5); /* Stronger shadow */
     transition: all 0.25s ease;
     pointer-events: auto;
 }
@@ -877,10 +873,8 @@ html, body {
 }
 
 .shortcut-add-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.2);
     transform: translateY(-4px);
-    box-shadow: 0 16px 50px rgba(0,0,0,0.6);
 }
 
 .shortcut-add-btn:hover .shortcut-add-icon-wrap {

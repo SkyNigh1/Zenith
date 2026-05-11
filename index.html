@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Liquid Glass CSS -->
+    <link rel="stylesheet" href="styles/glass.css">
+
     <!-- Styles -->
     <link rel="stylesheet" href="styles/main.css">
 
@@ -23,9 +26,12 @@
 </head>
 <body>
 
-    <!-- Background Layer (chargé par app.js avec Unsplash abstract) -->
+    <!-- Fond + canvas galaxie -->
     <div id="backgroundImage"></div>
     <canvas id="galaxyCanvas" style="display:none;"></canvas>
+
+    <!-- Conteneur vide pour les overlays LiquidGlass (animé avec le reste de la page) -->
+    <div id="glass-root"></div>
 
     <!-- ===== PANNEAU GAUCHE : Météo ===== -->
     <div class="left-panel">
@@ -37,7 +43,7 @@
         </div>
     </div>
 
-    <!-- ===== PANNEAU DROIT : Contrôles + Calendrier ===== -->
+    <!-- ===== PANNEAU DROIT : Boutons + Calendrier ===== -->
     <div class="right-panel">
         <div class="top-controls">
             <button class="ctrl-btn" id="expandBtn" title="Plein écran">
@@ -50,7 +56,6 @@
                 <i class="fas fa-cog"></i>
             </button>
         </div>
-
         <div class="calendar-widget glass-card" id="calendarWidget">
             <!-- Contenu injecté par calendar.js -->
         </div>
@@ -295,6 +300,11 @@
     <script src="js/shortcuts.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Liquid Glass library -->
+    <script src="js/vendor/container.js"></script>
+    <script src="js/vendor/button.js"></script>
+    <script src="js/liquidglass.js"></script>
 
 </body>
 </html>

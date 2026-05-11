@@ -101,11 +101,9 @@ function initParallax() {
     let target = { x: 0, y: 0 };
     let current = { x: 0, y: 0 };
 
-    document.addEventListener('mousemove', (e) => {
-        const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
-        target.x = ((e.clientX - cx) / cx) * 10;
-        target.y = ((e.clientY - cy) / cy) * 10;
-    });
+    // Parallax désactivé : le glass snapshot est statique (html2canvas),
+    // bouger le fond créerait un décalage visible entre le fond et le reflet dans le glass.
+    document.addEventListener('mousemove', () => {});
 
     const tick = () => {
         const ease = 0.03;
@@ -256,6 +254,7 @@ window.openSettings = () => {
 function initChat() {
     const chatPanel   = document.getElementById('chatPanel');
     const mainContent = document.getElementById('mainContent');
+    const glassRoot   = document.getElementById('glass-root');
     const leftPanel   = document.querySelector('.left-panel');
     const rightPanel  = document.querySelector('.right-panel');
     const scrollHint  = document.getElementById('scrollHint');
@@ -280,7 +279,7 @@ function initChat() {
 
         if (window.gsap) {
             gsap.to(chatPanel, { y: '0%', duration: 0.45, ease: 'power3.out' });
-            gsap.to([mainContent, leftPanel, rightPanel, scrollHint].filter(Boolean),
+            gsap.to([mainContent, glassRoot, leftPanel, rightPanel, scrollHint].filter(Boolean),
                 { opacity: 0, duration: 0.3, ease: 'power2.out' });
         } else {
             chatPanel.style.transform = 'translateY(0%)';
@@ -296,7 +295,7 @@ function initChat() {
 
         if (window.gsap) {
             gsap.to(chatPanel, { y: '100%', duration: 0.45, ease: 'power3.in' });
-            gsap.to([mainContent, leftPanel, rightPanel, scrollHint].filter(Boolean),
+            gsap.to([mainContent, glassRoot, leftPanel, rightPanel, scrollHint].filter(Boolean),
                 { opacity: 1, duration: 0.35, ease: 'power2.out', delay: 0.15 });
         } else {
             chatPanel.style.transform = 'translateY(100%)';
