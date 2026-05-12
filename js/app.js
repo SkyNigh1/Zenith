@@ -62,35 +62,52 @@ function loadBackground() {
 }
 
 function initBackgroundPicker() {
-    const btn = document.getElementById('imageBtn');
-    if (!btn) return;
-    
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png, image/jpeg, image/webp, image/gif';
     input.style.display = 'none';
     document.body.appendChild(input);
-    
-    btn.addEventListener('click', () => input.click());
-    
+
+    function applyBackground(dataUrl) {
+        const settings = JSON.parse(localStorage.getItem('zenithSettings') || '{}');
+        settings.customBackgroundDataUrl = dataUrl || null;
+        try {
+            localStorage.setItem('zenithSettings', JSON.stringify(settings));
+            loadBackground();
+            updateBgPreview();
+            if (typeof destroyOverlays === 'function' && typeof buildAndApplyOverlays === 'function') {
+                destroyOverlays();
+                buildAndApplyOverlays();
+            }
+        } catch (err) {
+            alert("L'image est trop volumineuse pour être sauvegardée dans le navigateur (limite souvent à 5MB).");
+        }
+    }
+
+    function updateBgPreview() {
+        const preview = document.getElementById('bgPreview');
+        if (!preview) return;
+        const settings = JSON.parse(localStorage.getItem('zenithSettings') || '{}');
+        const url = settings.customBackgroundDataUrl || `${encodeURI(DEFAULT_BG_IMAGE_PATH)}`;
+        preview.style.backgroundImage = `url('${url}')`;
+    }
+
+    document.getElementById('changeBgBtn')?.addEventListener('click', () => input.click());
+
+    document.getElementById('resetBgBtn')?.addEventListener('click', () => applyBackground(null));
+
     input.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
         const reader = new FileReader();
-        reader.onload = (event) => {
-            const dataUrl = event.target.result;
-            const settings = JSON.parse(localStorage.getItem('zenithSettings') || '{}');
-            settings.customBackgroundDataUrl = dataUrl;
-            try {
-                localStorage.setItem('zenithSettings', JSON.stringify(settings));
-                loadBackground();
-            } catch (err) {
-                alert("L'image est trop volumineuse pour être sauvegardée dans le navigateur (limite souvent à 5MB).");
-            }
-        };
+        reader.onload = (event) => applyBackground(event.target.result);
         reader.readAsDataURL(file);
+        input.value = '';
     });
+
+    // Mettre à jour la preview quand le modal s'ouvre
+    document.getElementById('customizeBtn')?.addEventListener('click', updateBgPreview);
+    updateBgPreview();
 }
 
 // Parallax doux sur fond
@@ -169,23 +186,68 @@ function initCustomizeModal() {
     const settings = JSON.parse(localStorage.getItem('zenithSettings') || '{}');
     if (icsInput && settings.ecalendarUrl) icsInput.value = settings.ecalendarUrl;
 
+    function modalCardOrigin() {
+        const btn  = document.getElementById('customizeBtn');
+        const card = overlay.querySelector('.modal-card');
+        if (!btn || !card) return '50% 100%';
+        const br = btn.getBoundingClientRect();
+        const cr = card.getBoundingClientRect();
+        const ox = ((br.left + br.width  / 2) - cr.left) / cr.width  * 100;
+        const oy = ((br.top  + br.height / 2) - cr.top)  / cr.height * 100;
+        return `${ox}% ${oy}%`;
+    }
+
+    const openModal = () => {
+        overlay.classList.add('active');
+        overlay.style.pointerEvents = 'auto';
+        if (window.gsap) gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power2.out' });
+        else overlay.style.opacity = '1';
+        requestAnimationFrame(() => {
+            const card = overlay.querySelector('.modal-card');
+            if (!card || !window.gsap) return;
+            const cg = window._glassCache?.['customizeModalOverlay'];
+            if (cg) { 
+                cg.element.style.opacity = ''; 
+                cg.stopRenderLoop?.(); 
+                // Force a single render frame to capture background correctly at scale 1 before animating
+                cg.render?.(); 
+            }
+            const origin = modalCardOrigin();
+            gsap.fromTo(card,
+                { scale: 0.04, transformOrigin: origin },
+                { scale: 1,    transformOrigin: origin, duration: 0.4, ease: 'expo.out',
+                  onComplete: () => { if (cg) cg.startRenderLoop?.(); }
+                }
+            );
+        });
+    };
+
     const closeModal = () => {
-        overlay.classList.remove('active');
+        const card = overlay.querySelector('.modal-card');
+        const origin = card ? modalCardOrigin() : '50% 100%';
+        const cg = window._glassCache?.['customizeModalOverlay'];
+        const finish = () => {
+            overlay.classList.remove('active');
+            overlay.style.pointerEvents = 'none';
+            if (cg) cg.element.style.opacity = '0';
+            if (card) gsap.set(card, { scale: 1, clearProps: 'transformOrigin' });
+        };
+        if (window.gsap) {
+            if (cg) cg.stopRenderLoop?.();
+            if (card) gsap.to(card, { scale: 0.04, transformOrigin: origin, duration: 0.22, ease: 'expo.in' });
+            gsap.to(overlay, { opacity: 0, duration: 0.25, ease: 'power2.in', onComplete: finish });
+        } else { finish(); }
         const url = icsInput?.value.trim() || '';
         if (window.CalendarWidget) window.CalendarWidget.setEcalendarUrl(url);
     };
 
-    openBtn?.addEventListener('click', () => {
-        renderGroqKeys();
-        renderMemory();
-        overlay.classList.add('active');
-    });
+    openBtn?.addEventListener('click', () => { renderGroqKeys(); renderMemory(); openModal(); });
     closeBtn?.addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
     icsSaveBtn?.addEventListener('click', () => {
         const url = icsInput?.value.trim() || '';
         if (window.CalendarWidget) window.CalendarWidget.setEcalendarUrl(url);
-        overlay.classList.remove('active');
+        closeModal();
     });
 
     // Groq key add
@@ -246,9 +308,33 @@ window.renderMemory = renderMemory;
 
 // Accessible globalement pour les messages d'erreur inline du chat
 window.openSettings = () => {
-    const overlay = document.getElementById('customizeModalOverlay');
-    if (overlay) { renderGroqKeys(); renderMemory(); overlay.classList.add('active'); }
+    document.getElementById('customizeBtn')?.click();
 };
+
+// ---- Helpers d'animation macOS ----
+function btnOrigin(btnId) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return '50% 50%';
+    const r = btn.getBoundingClientRect();
+    return `${r.left + r.width / 2}px ${r.top + r.height / 2}px`;
+}
+
+function macOpen(panel, btnId, bgEls) {
+    if (!window.gsap) { panel.style.transform = 'scale(1)'; panel.style.opacity = '1'; return; }
+    const origin = btnOrigin(btnId);
+    gsap.fromTo(panel,
+        { scale: 0.04, opacity: 0, transformOrigin: origin },
+        { scale: 1,    opacity: 1, duration: 0.42, ease: 'expo.out', transformOrigin: origin }
+    );
+    gsap.to(bgEls.filter(Boolean), { opacity: 0, duration: 0.22, ease: 'power2.out' });
+}
+
+function macClose(panel, btnId, bgEls, onDone) {
+    if (!window.gsap) { panel.style.transform = 'scale(0.04)'; panel.style.opacity = '0'; onDone?.(); return; }
+    const origin = btnOrigin(btnId);
+    gsap.to(panel, { scale: 0.04, opacity: 0, duration: 0.26, ease: 'expo.in', transformOrigin: origin, onComplete: onDone });
+    gsap.to(bgEls.filter(Boolean), { opacity: 1, duration: 0.3, ease: 'power2.out', delay: 0.1 });
+}
 
 // ---- Chat panel (transitions + input) ----
 function initChat() {
@@ -257,11 +343,11 @@ function initChat() {
     const glassRoot   = document.getElementById('glass-root');
     const leftPanel   = document.querySelector('.left-panel');
     const rightPanel  = document.querySelector('.right-panel');
-    const scrollHint  = document.getElementById('scrollHint');
     const backBtn     = document.getElementById('chatBackBtn');
     const sendBtn     = document.getElementById('chatSendBtn');
     const textarea    = document.getElementById('chatInput');
     const clearBtn    = document.getElementById('newConvBtn');
+    const bgEls       = [mainContent, glassRoot, leftPanel, rightPanel];
 
     if (!chatPanel) return;
 
@@ -272,56 +358,23 @@ function initChat() {
         isOpen = true;
         chatPanel.style.pointerEvents = 'auto';
 
-        // Sync le rendu + sidebar + état du bouton
         window.ZenithAI?._render();
         window.ZenithAI?.renderSidebar();
         syncSendBtn();
 
-        if (window.gsap) {
-            gsap.to(chatPanel, { y: '0%', duration: 0.45, ease: 'power3.out' });
-            gsap.to([mainContent, glassRoot, leftPanel, rightPanel, scrollHint].filter(Boolean),
-                { opacity: 0, duration: 0.3, ease: 'power2.out' });
-        } else {
-            chatPanel.style.transform = 'translateY(0%)';
-        }
-
-        setTimeout(() => textarea?.focus(), 460);
+        macOpen(chatPanel, 'chatBtn', bgEls);
+        setTimeout(() => textarea?.focus(), 420);
     };
 
     const closeChat = () => {
         if (!isOpen) return;
         isOpen = false;
-        chatPanel.style.pointerEvents = 'none';
-
-        if (window.gsap) {
-            gsap.to(chatPanel, { y: '100%', duration: 0.45, ease: 'power3.in' });
-            gsap.to([mainContent, glassRoot, leftPanel, rightPanel, scrollHint].filter(Boolean),
-                { opacity: 1, duration: 0.35, ease: 'power2.out', delay: 0.15 });
-        } else {
-            chatPanel.style.transform = 'translateY(100%)';
-        }
+        macClose(chatPanel, 'chatBtn', bgEls, () => {
+            chatPanel.style.pointerEvents = 'none';
+        });
     };
 
-    scrollHint?.addEventListener('click', openChat);
-
-    // Wheel down sur homepage → ouvrir ; wheel up en haut du chat → fermer
-    const chatMessages = document.getElementById('chatMessages');
-    document.addEventListener('wheel', (e) => {
-        if (!isOpen && e.deltaY > 30) {
-            openChat();
-        } else if (isOpen && e.deltaY < -30 && chatMessages && chatMessages.scrollTop === 0) {
-            closeChat();
-        }
-    }, { passive: true });
-
-    // Touch swipe up → ouvrir ; swipe down en haut du chat → fermer
-    let touchStartY = 0;
-    document.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
-    document.addEventListener('touchend', (e) => {
-        const dy = touchStartY - e.changedTouches[0].clientY;
-        if (!isOpen && dy > 60) openChat();
-        else if (isOpen && dy < -60 && chatMessages && chatMessages.scrollTop === 0) closeChat();
-    }, { passive: true });
+    document.getElementById('chatBtn')?.addEventListener('click', openChat);
 
     backBtn?.addEventListener('click', closeChat);
 
@@ -400,4 +453,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     initChat();
     window.ZenithAI?._render(); // état initial correct dès le chargement
 
+    // 9. Notes
+    initNotes();
+
 });
+
+function initNotes() {
+    const notesPanel  = document.getElementById('notesPanel');
+    const notesBtn    = document.getElementById('notesBtn');
+    const notesBackBtn = document.getElementById('notesBackBtn');
+    const mainContent = document.getElementById('mainContent');
+    const glassRoot   = document.getElementById('glass-root');
+    const leftPanel   = document.querySelector('.left-panel');
+    const rightPanel  = document.querySelector('.right-panel');
+
+    if (!notesPanel) return;
+
+    let isOpen = false;
+
+    const bgEls = [mainContent, glassRoot, leftPanel, rightPanel];
+
+    const openNotes = () => {
+        if (isOpen) return;
+        isOpen = true;
+        notesPanel.style.pointerEvents = 'auto';
+        macOpen(notesPanel, 'notesBtn', bgEls);
+        setTimeout(() => window.ZenithNotes?.showGraph(), 420);
+    };
+
+    const closeNotes = async () => {
+        if (!isOpen) return;
+        isOpen = false;
+        await window.ZenithNotes?.flushSave?.();
+        macClose(notesPanel, 'notesBtn', bgEls, () => {
+            notesPanel.style.pointerEvents = 'none';
+        });
+    };
+
+    notesBtn?.addEventListener('click', openNotes);
+    notesBackBtn?.addEventListener('click', closeNotes);
+}

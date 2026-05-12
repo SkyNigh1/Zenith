@@ -298,6 +298,28 @@ class WeatherWidget {
         `;
 
         this.attachLocationListeners();
+        this._refreshGlassOverlay();
+    }
+
+    _refreshGlassOverlay() {
+        // Double rAF : laisser le DOM calculer la taille finale après injection du HTML
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (!this.container) return;
+                const rect = this.container.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) return;
+
+                // Trouver l'overlay taggé pour ce widget et le repositionner
+                const overlay = document.querySelector('[data-glass-for="weatherWidget"]');
+                if (!overlay) return;
+                overlay.style.top       = rect.top    + 'px';
+                overlay.style.left      = rect.left   + 'px';
+                overlay.style.width     = rect.width  + 'px';
+                overlay.style.height    = rect.height + 'px';
+                overlay.style.minWidth  = rect.width  + 'px';
+                overlay.style.minHeight = rect.height + 'px';
+            });
+        });
     }
 
     attachLocationListeners() {

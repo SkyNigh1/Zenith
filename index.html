@@ -12,6 +12,10 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+
     <!-- Liquid Glass CSS -->
     <link rel="stylesheet" href="styles/glass.css">
 
@@ -45,20 +49,22 @@
 
     <!-- ===== PANNEAU DROIT : Boutons + Calendrier ===== -->
     <div class="right-panel">
-        <div class="top-controls">
-            <button class="ctrl-btn" id="expandBtn" title="Plein écran">
-                <i class="fas fa-expand-arrows-alt"></i>
-            </button>
-            <button class="ctrl-btn" id="imageBtn" title="Changer l'image">
-                <i class="fas fa-image"></i>
-            </button>
-            <button class="ctrl-btn" id="customizeBtn" title="Personnaliser">
-                <i class="fas fa-cog"></i>
-            </button>
-        </div>
         <div class="calendar-widget glass-card" id="calendarWidget">
             <!-- Contenu injecté par calendar.js -->
         </div>
+    </div>
+
+    <!-- Boutons d'action — centrés en bas de l'écran -->
+    <div class="top-controls">
+        <button class="ctrl-btn" id="notesBtn" title="Notes">
+            <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M16,14H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Zm0-4H10a1,1,0,0,0,0,2h6a1,1,0,0,0,0-2Zm4-6H17V3a1,1,0,0,0-2,0V4H13V3a1,1,0,0,0-2,0V4H9V3A1,1,0,0,0,7,3V4H4A1,1,0,0,0,3,5V19a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V5A1,1,0,0,0,20,4ZM19,19a1,1,0,0,1-1,1H6a1,1,0,0,1-1-1V6H7V7A1,1,0,0,0,9,7V6h2V7a1,1,0,0,0,2,0V6h2V7a1,1,0,0,0,2,0V6h2Z"/></svg>
+        </button>
+        <button class="ctrl-btn ctrl-btn-logo" id="chatBtn" title="Assistant IA">
+            <img src="assets/img/logo.png" alt="IA" class="ctrl-logo-img">
+        </button>
+        <button class="ctrl-btn" id="customizeBtn" title="Personnaliser">
+            <i class="fas fa-cog"></i>
+        </button>
     </div>
 
     <!-- ===== CONTENU CENTRAL ===== -->
@@ -114,10 +120,122 @@
         </div>
     </main>
 
-    <!-- Flèche bas — clic = ouvrir le chat IA -->
-    <div class="scroll-hint" id="scrollHint">
-        <div class="scroll-hint-inner">
-            <i class="fas fa-chevron-down"></i>
+    <!-- ===== PANNEAU NOTES ===== -->
+    <div class="notes-panel" id="notesPanel">
+
+        <!-- Sidebar arborescence -->
+        <div class="notes-sidebar">
+            <div class="notes-sidebar-header">
+                <span class="notes-sidebar-title">
+                    <i class="fas fa-book-open" style="margin-right:0.5rem;opacity:0.6;font-size:0.8rem"></i>
+                    Notes
+                </span>
+                <div class="notes-sidebar-btns">
+                    <button class="notes-sidebar-btn" id="newNoteBtn" title="Nouveau fichier">
+                        <i class="fas fa-file-medical"></i>
+                    </button>
+                    <button class="notes-sidebar-btn" id="newFolderBtn" title="Nouveau dossier">
+                        <i class="fas fa-folder-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="notes-tree" id="notesTree"></div>
+        </div>
+
+        <!-- Zone principale -->
+        <div class="notes-main">
+
+            <!-- Contenu éditeur (header + toolbar + éditeur) -->
+            <div class="notes-content-area">
+
+                <!-- Header -->
+                <div class="notes-header">
+                    <button class="notes-back-btn" id="notesBackBtn" title="Retour">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <span class="notes-header-title" id="notesHeaderTitle">Notes</span>
+                    <button class="notes-graph-view-btn" id="notesGraphViewBtn" title="Vue graphe" style="display:none">
+                        <i class="fas fa-project-diagram"></i>
+                        <span>Graphe</span>
+                    </button>
+                    <button class="notes-ai-toggle-btn" id="notesAiToggleBtn" title="Assistant IA">
+                        <i class="fas fa-robot"></i>
+                        <span>IA</span>
+                    </button>
+                </div>
+
+                <!-- Toolbar de formatage -->
+                <div class="notes-toolbar" id="notesToolbar">
+                    <button class="ntb-btn" data-cmd="bold" title="Gras (Ctrl+B)"><b>B</b></button>
+                    <button class="ntb-btn" data-cmd="italic" title="Italique (Ctrl+I)"><i>I</i></button>
+                    <button class="ntb-btn" data-cmd="underline" title="Souligné (Ctrl+U)"><u>U</u></button>
+                    <button class="ntb-btn" data-cmd="strikeThrough" title="Barré"><s>S</s></button>
+                    <div class="ntb-sep"></div>
+                    <button class="ntb-btn ntb-label" data-cmd="formatBlock" data-val="h1" title="Titre 1">H1</button>
+                    <button class="ntb-btn ntb-label" data-cmd="formatBlock" data-val="h2" title="Titre 2">H2</button>
+                    <button class="ntb-btn ntb-label" data-cmd="formatBlock" data-val="h3" title="Titre 3">H3</button>
+                    <button class="ntb-btn ntb-label" data-cmd="formatBlock" data-val="p" title="Paragraphe">¶</button>
+                    <div class="ntb-sep"></div>
+                    <button class="ntb-btn" data-cmd="formatBlock" data-val="blockquote" title="Citation">
+                        <i class="fas fa-quote-left"></i>
+                    </button>
+                    <button class="ntb-btn" data-cmd="insertUnorderedList" title="Liste à puces">
+                        <i class="fas fa-list-ul"></i>
+                    </button>
+                    <button class="ntb-btn" data-cmd="insertOrderedList" title="Liste numérotée">
+                        <i class="fas fa-list-ol"></i>
+                    </button>
+                    <div class="ntb-sep"></div>
+                    <button class="ntb-btn" data-cmd="removeFormat" title="Effacer la mise en forme">
+                        <i class="fas fa-remove-format"></i>
+                    </button>
+                </div>
+
+                <!-- Éditeur -->
+                <div class="notes-editor-wrap">
+                    <canvas class="notes-graph-canvas" id="notesGraph"></canvas>
+                    <div class="notes-empty" id="notesEmpty">
+                        <i class="fas fa-book notes-empty-icon"></i>
+                        <p class="notes-empty-text">Sélectionnez une note ou créez-en une</p>
+                        <p class="notes-empty-sub">Utilisez les boutons <i class="fas fa-file-medical"></i> et <i class="fas fa-folder-plus"></i> dans la barre latérale</p>
+                    </div>
+                    <div class="notes-editor" id="notesEditor" contenteditable="false" spellcheck="true"></div>
+                    <div class="notes-code-editor" id="notesCodeEditor" style="display:none">
+                        <textarea id="notesCodeTextarea"></textarea>
+                    </div>
+                </div>
+
+            </div><!-- /.notes-content-area -->
+
+            <!-- Panneau IA (Copilot-style) -->
+            <div class="notes-ai-panel" id="notesAiPanel" style="display:none">
+
+                <!-- Header IA -->
+                <div class="notes-ai-header">
+                    <i class="fas fa-robot notes-ai-logo"></i>
+                    <span class="notes-ai-title">Assistant IA</span>
+                    <div class="notes-ai-mode-btns">
+                        <button class="notes-ai-mode-btn active" data-mode="ask">Ask</button>
+                        <button class="notes-ai-mode-btn" data-mode="agent">Agent</button>
+                    </div>
+                    <button class="notes-ai-icon-btn" id="notesAiClearBtn" title="Effacer la conversation">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+
+                <!-- Messages -->
+                <div class="notes-ai-messages" id="notesAiMessages"></div>
+
+                <!-- Saisie -->
+                <div class="notes-ai-input-area">
+                    <textarea class="notes-ai-input" id="notesAiInput" placeholder="Pose une question ou décris une tâche…" rows="1"></textarea>
+                    <button class="notes-ai-send" id="notesAiSend" title="Envoyer (Entrée)">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>
+
+            </div><!-- /.notes-ai-panel -->
+
         </div>
     </div>
 
@@ -231,6 +349,30 @@
             </div>
             <div class="customize-sections">
 
+                <!-- Image de fond -->
+                <div class="customize-section">
+                    <label class="section-label">
+                        <i class="fas fa-image" style="margin-right:0.4rem;opacity:0.7"></i>
+                        Image de fond
+                    </label>
+                    <div class="bg-picker-row">
+                        <div class="bg-preview" id="bgPreview"></div>
+                        <div class="bg-picker-actions">
+                            <button class="btn-submit" id="changeBgBtn">
+                                <i class="fas fa-folder-open"></i>
+                                Choisir une image
+                            </button>
+                            <button class="btn-secondary" id="resetBgBtn">
+                                <i class="fas fa-undo"></i>
+                                Par défaut
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Séparateur -->
+                <div style="height:1px;background:rgba(255,255,255,0.14);margin:0 -0.25rem"></div>
+
                 <!-- Clés API Groq -->
                 <div class="customize-section">
                     <label class="section-label">
@@ -250,7 +392,7 @@
                 </div>
 
                 <!-- Séparateur -->
-                <div style="height:1px;background:rgba(255,255,255,0.07);margin:0 -0.25rem"></div>
+                <div style="height:1px;background:rgba(255,255,255,0.14);margin:0 -0.25rem"></div>
 
                 <!-- Mémoire -->
                 <div class="customize-section">
@@ -271,7 +413,7 @@
                 </div>
 
                 <!-- Séparateur -->
-                <div style="height:1px;background:rgba(255,255,255,0.07);margin:0 -0.25rem"></div>
+                <div style="height:1px;background:rgba(255,255,255,0.14);margin:0 -0.25rem"></div>
 
                 <!-- Calendrier ICS -->
                 <div class="customize-section">
@@ -292,7 +434,34 @@
         </div>
     </div>
 
+    <!-- CodeMirror core + modes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/ruby/ruby.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/rust/rust.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/go/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/lua/lua.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/php/php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/vue/vue.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/swift/swift.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/dart/dart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/r/r.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+
     <!-- Scripts -->
+    <script src="js/notes.js"></script>
+    <script src="js/notesai.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/animation-manager.js"></script>
     <script src="js/weather.js"></script>

@@ -63,9 +63,8 @@ class Container {
   updateSizeFromDOM() {
     // Wait for next frame to ensure DOM layout is complete
     requestAnimationFrame(() => {
-      const rect = this.element.getBoundingClientRect()
-      let newWidth = Math.ceil(rect.width)
-      let newHeight = Math.ceil(rect.height)
+      let newWidth = this.element.offsetWidth || 1;
+      let newHeight = this.element.offsetHeight || 1;
 
       // Apply type-specific sizing logic
       if (this.type === 'circle') {
@@ -131,6 +130,21 @@ class Container {
 
     // Get initial size from DOM
     this.updateSizeFromDOM()
+
+    // Add resize observer to automatically recompute layout
+    if (typeof ResizeObserver !== 'undefined') {
+        this._ro = new ResizeObserver(() => {
+            this.updateSizeFromDOM()
+        })
+        // Delay attachment slightly so parentElement is set
+        setTimeout(() => {
+            if (this.element.parentElement) {
+                this._ro.observe(this.element.parentElement)
+            } else {
+                this._ro.observe(this.element)
+            }
+        }, 50)
+    }
 
     // Handle page snapshot
     if (Container.pageSnapshot) {
@@ -638,30 +652,31 @@ class Container {
   }
 
   startRenderLoop() {
+    let rafId = null
+
     const render = () => {
       if (!this.gl_refs.gl) return
 
       const gl = this.gl_refs.gl
       gl.clear(gl.COLOR_BUFFER_BIT)
 
-      // Update scroll position
       const scrollY = window.pageYOffset || document.documentElement.scrollTop
       gl.uniform1f(this.gl_refs.scrollYLoc, scrollY)
 
-      // Update container position (in case it moved)
       const position = this.getPosition()
       gl.uniform2f(this.gl_refs.containerPositionLoc, position.x, position.y)
 
       gl.drawArrays(gl.TRIANGLES, 0, 6)
+
+      rafId = requestAnimationFrame(loop)
     }
 
-    render()
+    const loop = () => render()
 
-    const handleScroll = () => render()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-
-    // Store render function for external calls
     this.render = render
+    this.stopRenderLoop = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null } }
+
+    render()
   }
 
   createProgram(gl, vsSource, fsSource) {

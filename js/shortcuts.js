@@ -54,15 +54,59 @@ class NewShortcutManager {
         localStorage.setItem('zenithShortcutsNew', JSON.stringify(this.shortcuts));
     }
 
+    modalCardOrigin() {
+        const btn  = document.getElementById('addShortcutBtn');
+        const card = this.modal?.querySelector('.modal-card');
+        if (!btn || !card) return '50% 100%';
+        const br = btn.getBoundingClientRect();
+        const cr = card.getBoundingClientRect();
+        const ox = ((br.left + br.width  / 2) - cr.left) / cr.width  * 100;
+        const oy = ((br.top  + br.height / 2) - cr.top)  / cr.height * 100;
+        return `${ox}% ${oy}%`;
+    }
+
     openModal() {
         this.modal.classList.add('active');
+        this.modal.style.pointerEvents = 'auto';
+        if (window.gsap) gsap.fromTo(this.modal, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power2.out' });
+        else this.modal.style.opacity = '1';
+        requestAnimationFrame(() => {
+            const card = this.modal.querySelector('.modal-card');
+            if (!card || !window.gsap) return;
+            const cg = window._glassCache?.['modalOverlay'];
+            if (cg) {
+                cg.element.style.opacity = '';
+                cg.stopRenderLoop?.();
+                cg.render?.();
+            }
+            const origin = this.modalCardOrigin();
+            gsap.fromTo(card,
+                { scale: 0.04, transformOrigin: origin },
+                { scale: 1,    transformOrigin: origin, duration: 0.4, ease: 'expo.out',
+                  onComplete: () => { if (cg) cg.startRenderLoop?.(); }
+                }
+            );
+        });
         document.getElementById('shortcutName').value = '';
         document.getElementById('shortcutUrl').value = '';
-        setTimeout(() => document.getElementById('shortcutName').focus(), 50);
+        setTimeout(() => document.getElementById('shortcutName').focus(), 420);
     }
 
     closeModal() {
-        this.modal.classList.remove('active');
+        const card = this.modal.querySelector('.modal-card');
+        const origin = card ? this.modalCardOrigin() : '50% 100%';
+        const cg = window._glassCache?.['modalOverlay'];
+        const finish = () => {
+            this.modal.classList.remove('active');
+            this.modal.style.pointerEvents = 'none';
+            if (cg) cg.element.style.opacity = '0';
+            if (card && window.gsap) gsap.set(card, { scale: 1, clearProps: 'transformOrigin' });
+        };
+        if (window.gsap) {
+            if (cg) cg.stopRenderLoop?.();
+            if (card) gsap.to(card, { scale: 0.04, transformOrigin: origin, duration: 0.22, ease: 'expo.in' });
+            gsap.to(this.modal, { opacity: 0, duration: 0.25, ease: 'power2.in', onComplete: finish });
+        } else { finish(); }
     }
 
     addShortcut() {

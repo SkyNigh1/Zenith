@@ -58,6 +58,7 @@ function createGlassOverlay(targetEl, borderRadius) {
     el.style.minWidth  = rect.width  + 'px';
     el.style.minHeight = rect.height + 'px';
     el.style.padding   = '0';
+    if (targetEl.id) el.dataset.glassFor = targetEl.id;
 
     glassRoot.appendChild(el);
     return container;
@@ -109,6 +110,10 @@ function applyShortcutGlass() {
 // ─── Détruire tous les overlays existants ────────────────────────────────────
 
 function destroyOverlays() {
+    // Arrêter les boucles rAF de toutes les instances
+    Container.instances.forEach(c => c.stopRenderLoop?.());
+    Container.instances = [];
+
     // Overlays dans glass-root
     const glassRoot = document.getElementById('glass-root');
     if (glassRoot) glassRoot.innerHTML = '';
@@ -117,6 +122,13 @@ function destroyOverlays() {
     document.querySelectorAll('#shortcutsGrid .shortcut-item .glass-container').forEach(el => el.remove());
     const addBtn = document.getElementById('addShortcutBtn');
     addBtn?.querySelector('.glass-container')?.remove();
+
+    // Vider les glass modales inline
+    ['modalOverlay', 'customizeModalOverlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        overlay?.querySelector('.modal-card .glass-container')?.remove();
+    });
+    window._glassCache = {};
 
     Container.pageSnapshot       = null;
     Container.isCapturing        = false;
@@ -134,9 +146,9 @@ async function buildAndApplyOverlays() {
     const els = {
         weather:     document.getElementById('weatherWidget'),
         calendar:    document.getElementById('calendarWidget'),
-        expand:      document.getElementById('expandBtn'),
-        image:       document.getElementById('imageBtn'),
+        notes:       document.getElementById('notesBtn'),
         customize:   document.getElementById('customizeBtn'),
+        chat:        document.getElementById('chatBtn'),
         search:      document.querySelector('.search-wrapper'),
         shortcutsWrap: document.querySelector('.shortcuts-wrapper'),
         addShortcut: document.getElementById('addShortcutBtn'),
@@ -147,7 +159,7 @@ async function buildAndApplyOverlays() {
     );
 
     // Retirer le CSS glass des éléments statiques AVANT de créer les containers
-    [els.weather, els.calendar, els.expand, els.image, els.customize, els.search, els.shortcutsWrap].forEach(el => {
+    [els.weather, els.calendar, els.notes, els.customize, els.chat, els.search, els.shortcutsWrap].forEach(el => {
         if (!el) return;
         el.style.background           = 'transparent';
         el.style.backdropFilter       = 'none';
@@ -175,9 +187,9 @@ async function buildAndApplyOverlays() {
     // Éléments statiques → overlay dans glass-root
     createGlassOverlay(els.weather,   20);
     createGlassOverlay(els.calendar,  20);
-    createGlassOverlay(els.expand,    12);
-    createGlassOverlay(els.image,     12);
+    createGlassOverlay(els.notes,     12);
     createGlassOverlay(els.customize, 12);
+    createGlassOverlay(els.chat,      12);
     createGlassOverlay(els.search,    50); // clamped → pill
 
     // Favoris → overlay inline (suit le hover translateY)
@@ -185,13 +197,52 @@ async function buildAndApplyOverlays() {
     createGlassOverlayInline(els.addShortcut, 20);
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+// ─── Pré-chauffage des glass modales (crée les containers avant la 1ère ouverture) ──
+
+window._glassCache = {};
+
+async function preWarmModalGlass() {
+    if (typeof Container === 'undefined') return;
+
+    const targets = ['modalOverlay', 'customizeModalOverlay'];
+    for (const overlayId of targets) {
+        const overlay = document.getElementById(overlayId);
+        if (!overlay) continue;
+        const card = overlay.querySelector('.modal-card');
+        if (!card) continue;
+
+        overlay.classList.add('active');
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        // 2 rAF pour que le layout soit calculé
+        await new Promise(r => requestAnimationFrame(r));
+        await new Promise(r => requestAnimationFrame(r));
+
+        const g = createGlassOverlayInline(card, 22);
+        if (g) {
+            // Attendre que setupShader soit terminé (img.onload async) avec les bonnes dimensions
+            let attempts = 0;
+            while (!g.webglInitialized && attempts < 60) {
+                await new Promise(r => requestAnimationFrame(r));
+                attempts++;
+            }
+            g.element.style.opacity = '0';
+            window._glassCache[overlayId] = g;
+        }
+
+        overlay.classList.remove('active');
+        overlay.style.opacity = '';
+        overlay.style.pointerEvents = '';
+    }
+}
 
 async function initLiquidGlass() {
     if (typeof Container === 'undefined') return;
     if (document.fonts?.ready) await document.fonts.ready;
 
     await buildAndApplyOverlays();
+    await preWarmModalGlass();
+
 
     // Suivre les ajouts/suppressions de favoris
     const grid = document.getElementById('shortcutsGrid');
@@ -210,6 +261,7 @@ async function initLiquidGlass() {
         resizeDebounce = setTimeout(async () => {
             destroyOverlays();
             await buildAndApplyOverlays();
+            await preWarmModalGlass();
         }, 250);
     });
 }
