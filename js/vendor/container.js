@@ -198,12 +198,12 @@ class Container {
   }
 
   getPosition() {
-    // Get actual screen position using getBoundingClientRect
+    // _noCache = true sur les containers animés (GSAP, hover CSS) — toujours recalculer
+    if (!this._noCache && !this._posDirty && this._cachedPos) return this._cachedPos
     const rect = this.canvas.getBoundingClientRect()
-    return {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2
-    }
+    this._cachedPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    this._posDirty = false
+    return this._cachedPos
   }
 
   capturePageSnapshot() {

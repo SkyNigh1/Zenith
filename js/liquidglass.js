@@ -34,6 +34,96 @@ function buildBackgroundSnapshot() {
     });
 }
 
+// ─── Snapshots pré-calculés (bg + panel) ─────────────────────────────────────
+
+// Both canvases are built once at startup. Switching is a single synchronous
+// WebGL texImage2D call per instance — no shader recompile, no Image decode.
+let _bgCanvas    = null;
+let _panelCanvas = null;
+
+function _buildSnapshotFromImage(img, darkOverlay) {
+    const canvas = document.createElement('canvas');
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, -20, -20, canvas.width + 40, canvas.height + 40);
+    ctx.fillStyle = darkOverlay;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Pre-cache toDataURL — used only by initWebGL on first Container creation
+    const cached = canvas.toDataURL('image/jpeg', 0.85);
+    canvas.toDataURL = () => cached;
+    return canvas;
+}
+
+function buildBothSnapshots() {
+    const bgEl = document.getElementById('backgroundImage');
+    if (!bgEl) return Promise.resolve([null, null]);
+
+    const bgStyle = bgEl.style.backgroundImage || getComputedStyle(bgEl).backgroundImage;
+    const match   = bgStyle.match(/url\(["']?([^"')]+)["']?\)/);
+    if (!match) return Promise.resolve([null, null]);
+
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            _bgCanvas    = _buildSnapshotFromImage(img, 'rgba(4, 4, 14, 0.4)');
+            _panelCanvas = _buildSnapshotFromImage(img, 'rgba(7, 7, 20, 0.84)');
+            resolve([_bgCanvas, _panelCanvas]);
+        };
+        img.onerror = () => resolve([null, null]);
+        img.src = match[1];
+    });
+}
+
+// Direct synchronous WebGL texture upload — bypasses setupShader entirely
+function _swapGlassTexture(canvas) {
+    if (typeof Container === 'undefined' || !canvas) return;
+    Container.pageSnapshot = canvas;
+    Container.instances.forEach(c => {
+        if (!c.gl_refs?.gl || !c.gl_refs?.texture) return;
+        const { gl, texture, textureSizeLoc } = c.gl_refs;
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        if (textureSizeLoc) gl.uniform2f(textureSizeLoc, canvas.width, canvas.height);
+    });
+}
+
+function activatePanelSnapshot()   { _swapGlassTexture(_panelCanvas); }
+function deactivatePanelSnapshot() { _swapGlassTexture(_bgCanvas);    }
+
+window._activatePanelSnapshot   = activatePanelSnapshot;
+window._deactivatePanelSnapshot = deactivatePanelSnapshot;
+
+// Invalider le cache de position de tous les containers (appeler après tout changement de layout)
+window._invalidateGlassPositions = function() {
+    if (typeof Container === 'undefined') return;
+    Container.instances.forEach(c => { c._posDirty = true; });
+};
+
+// ─── Radius map : retient le borderRadius utilisé pour chaque élément ────────
+
+const _overlayRadiusMap = new WeakMap();
+
+// ─── Rebuild d'un seul overlay (après resize du widget) ──────────────────────
+
+function _rebuildOverlayFor(targetEl) {
+    if (!targetEl?.id || typeof Container === 'undefined') return;
+    const glassRoot = document.getElementById('glass-root');
+    if (!glassRoot) return;
+
+    // Stopper et supprimer l'ancien container
+    const toRemove = [...glassRoot.querySelectorAll(`[data-glass-for="${targetEl.id}"]`)];
+    toRemove.forEach(el => {
+        const idx = Container.instances.findIndex(c => c.element === el);
+        if (idx >= 0) { Container.instances[idx].stopRenderLoop?.(); Container.instances.splice(idx, 1); }
+        el.remove();
+    });
+
+    // Recréer au bon endroit et à la bonne taille
+    const radius = _overlayRadiusMap.get(targetEl) ?? 20;
+    createGlassOverlay(targetEl, radius);
+}
+
 // ─── Overlay en position absolue dans #glass-root (éléments statiques) ───────
 
 function createGlassOverlay(targetEl, borderRadius) {
@@ -59,6 +149,7 @@ function createGlassOverlay(targetEl, borderRadius) {
     el.style.minHeight = rect.height + 'px';
     el.style.padding   = '0';
     if (targetEl.id) el.dataset.glassFor = targetEl.id;
+    _overlayRadiusMap.set(targetEl, borderRadius); // mémoriser pour rebuild
 
     glassRoot.appendChild(el);
     return container;
@@ -103,7 +194,9 @@ function applyShortcutGlass() {
         item.style.backdropFilter       = 'none';
         item.style.webkitBackdropFilter = 'none';
         item.style.boxShadow            = 'none';
-        createGlassOverlayInline(item, 20);
+        const c = createGlassOverlayInline(item, 20);
+        // Hover CSS translateY → position change non détectable par le cache JS
+        if (c) c._noCache = true;
     });
 }
 
@@ -117,6 +210,11 @@ function destroyOverlays() {
     // Overlays dans glass-root
     const glassRoot = document.getElementById('glass-root');
     if (glassRoot) glassRoot.innerHTML = '';
+
+    // Overlays inline dans les boutons du dock
+    ['notesBtn', 'chatBtn', 'widgetsBtn', 'customizeBtn'].forEach(id => {
+        document.getElementById(id)?.querySelector('.glass-container')?.remove();
+    });
 
     // Overlays inline dans les favoris
     document.querySelectorAll('#shortcutsGrid .shortcut-item .glass-container').forEach(el => el.remove());
@@ -133,6 +231,8 @@ function destroyOverlays() {
     Container.pageSnapshot       = null;
     Container.isCapturing        = false;
     Container.waitingForSnapshot = [];
+    _bgCanvas    = null;
+    _panelCanvas = null;
 }
 
 // ─── Construire et appliquer tous les overlays ───────────────────────────────
@@ -140,15 +240,19 @@ function destroyOverlays() {
 async function buildAndApplyOverlays() {
     if (typeof Container === 'undefined') return;
 
-    const snapshotPromise = buildBackgroundSnapshot();
+    const snapshotPromise = buildBothSnapshots();
     await new Promise(r => setTimeout(r, 200));
 
     const els = {
+        market:      document.getElementById('marketWidget'),
+        f1:          document.getElementById('f1Widget'),
         weather:     document.getElementById('weatherWidget'),
         calendar:    document.getElementById('calendarWidget'),
+        news:        document.getElementById('newsWidget'),
         notes:       document.getElementById('notesBtn'),
         customize:   document.getElementById('customizeBtn'),
         chat:        document.getElementById('chatBtn'),
+        widgets:     document.getElementById('widgetsBtn'),
         search:      document.querySelector('.search-wrapper'),
         shortcutsWrap: document.querySelector('.shortcuts-wrapper'),
         addShortcut: document.getElementById('addShortcutBtn'),
@@ -159,7 +263,7 @@ async function buildAndApplyOverlays() {
     );
 
     // Retirer le CSS glass des éléments statiques AVANT de créer les containers
-    [els.weather, els.calendar, els.notes, els.customize, els.chat, els.search, els.shortcutsWrap].forEach(el => {
+    [els.market, els.f1, els.weather, els.calendar, els.notes, els.customize, els.chat, els.widgets, els.search, els.shortcutsWrap].forEach(el => {
         if (!el) return;
         el.style.background           = 'transparent';
         el.style.backdropFilter       = 'none';
@@ -178,23 +282,53 @@ async function buildAndApplyOverlays() {
 
     await new Promise(r => requestAnimationFrame(r));
 
-    const snapshot = await snapshotPromise;
-    if (snapshot) {
-        Container.pageSnapshot = snapshot;
+    const [bgSnap] = await snapshotPromise;
+    if (bgSnap) {
+        Container.pageSnapshot = bgSnap;
         Container.isCapturing  = false;
     }
 
-    // Éléments statiques → overlay dans glass-root
+    // Widgets & panels statiques → overlay dans glass-root
+    createGlassOverlay(els.market,    20);
+    createGlassOverlay(els.f1,        20);
     createGlassOverlay(els.weather,   20);
     createGlassOverlay(els.calendar,  20);
-    createGlassOverlay(els.notes,     12);
-    createGlassOverlay(els.customize, 12);
-    createGlassOverlay(els.chat,      12);
     createGlassOverlay(els.search,    50); // clamped → pill
 
-    // Favoris → overlay inline (suit le hover translateY)
-    shortcutItems.forEach(item => createGlassOverlayInline(item, 20));
-    createGlassOverlayInline(els.addShortcut, 20);
+    // Boutons ctrl → inline (suivent le CSS transform du dock)
+    createGlassOverlayInline(els.notes,     12);
+    createGlassOverlayInline(els.chat,      12);
+    createGlassOverlayInline(els.widgets,   12);
+    createGlassOverlayInline(els.customize, 12);
+
+    // Favoris → overlay inline (suit le hover translateY → _noCache requis)
+    shortcutItems.forEach(item => {
+        const c = createGlassOverlayInline(item, 20);
+        if (c) c._noCache = true;
+    });
+    const addC = createGlassOverlayInline(els.addShortcut, 20);
+    if (addC) addC._noCache = true;
+
+    // Surveiller les widgets glass-card : si l'un d'eux change de taille (météo,
+    // marché qui charge…), reconstruire les overlays de TOUTE la colonne concernée —
+    // car un widget qui grandit pousse vers le bas ses voisins dans la même colonne.
+    if (typeof ResizeObserver !== 'undefined') {
+        let _colDebounce = null;
+        const ro = new ResizeObserver(entries => {
+            const cols = new Set(
+                entries.map(e => e.target.closest('.widget-col')).filter(Boolean)
+            );
+            clearTimeout(_colDebounce);
+            _colDebounce = setTimeout(() => {
+                cols.forEach(col => {
+                    col.querySelectorAll('.glass-card[data-widget-id]').forEach(el => {
+                        _rebuildOverlayFor(el);
+                    });
+                });
+            }, 180);
+        });
+        document.querySelectorAll('.glass-card[data-widget-id]').forEach(el => ro.observe(el));
+    }
 }
 
 // ─── Pré-chauffage des glass modales (crée les containers avant la 1ère ouverture) ──
@@ -203,6 +337,7 @@ window._glassCache = {};
 
 async function preWarmModalGlass() {
     if (typeof Container === 'undefined') return;
+    if (document.body.classList.contains('ui-classic')) return;
 
     const targets = ['modalOverlay', 'customizeModalOverlay'];
     for (const overlayId of targets) {
@@ -220,6 +355,8 @@ async function preWarmModalGlass() {
 
         const g = createGlassOverlayInline(card, 22);
         if (g) {
+            // Modale animée par GSAP → position doit être recalculée chaque frame
+            g._noCache = true;
             // Attendre que setupShader soit terminé (img.onload async) avec les bonnes dimensions
             let attempts = 0;
             while (!g.webglInitialized && attempts < 60) {

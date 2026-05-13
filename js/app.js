@@ -112,24 +112,8 @@ function initBackgroundPicker() {
 
 // Parallax doux sur fond
 function initParallax() {
-    const bg = document.getElementById('backgroundImage');
-    if (!bg) return;
-
-    let target = { x: 0, y: 0 };
-    let current = { x: 0, y: 0 };
-
-    // Parallax désactivé : le glass snapshot est statique (html2canvas),
-    // bouger le fond créerait un décalage visible entre le fond et le reflet dans le glass.
-    document.addEventListener('mousemove', () => {});
-
-    const tick = () => {
-        const ease = 0.03;
-        current.x += (target.x - current.x) * ease;
-        current.y += (target.y - current.y) * ease;
-        bg.style.transform = `translate(${current.x}px, ${current.y}px)`;
-        requestAnimationFrame(tick);
-    };
-    tick();
+    // Parallax désactivé — le snapshot glass est statique, bouger le fond
+    // créerait un décalage visible entre fond et reflet.
 }
 
 // ---- Recherche ----
@@ -169,6 +153,90 @@ function renderGroqKeys() {
             renderGroqKeys();
             window.ZenithAI?._render();
         });
+    });
+}
+
+// ---- Accent color ----
+const ACCENT_COLOR_KEY = 'zenithAccentColor';
+const DEFAULT_ACCENT   = '#5c62ff';
+
+function _hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+function applyAccentColor(hex) {
+    document.documentElement.style.setProperty('--accent-color', hex);
+    const [r,g,b] = _hexToRgb(hex);
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r},${g},${b},0.25)`);
+    localStorage.setItem(ACCENT_COLOR_KEY, hex);
+}
+
+function initAccentColor() {
+    applyAccentColor(localStorage.getItem(ACCENT_COLOR_KEY) || DEFAULT_ACCENT);
+}
+
+function initAccentPicker() {
+    const container = document.getElementById('accentSwatches');
+    if (!container) return;
+    const colorInput = document.getElementById('accentColorInput');
+    const current = localStorage.getItem(ACCENT_COLOR_KEY) || DEFAULT_ACCENT;
+    if (colorInput) colorInput.value = current;
+
+    const updateActive = (color) => {
+        container.querySelectorAll('.accent-swatch[data-color]').forEach(s => {
+            s.classList.toggle('active', s.dataset.color.toLowerCase() === color.toLowerCase());
+        });
+    };
+    updateActive(current);
+
+    container.addEventListener('click', (e) => {
+        const swatch = e.target.closest('.accent-swatch[data-color]');
+        if (!swatch) return;
+        applyAccentColor(swatch.dataset.color);
+        updateActive(swatch.dataset.color);
+        if (colorInput) colorInput.value = swatch.dataset.color;
+    });
+
+    colorInput?.addEventListener('input', (e) => {
+        applyAccentColor(e.target.value);
+        updateActive(e.target.value);
+    });
+}
+
+// ---- UI Style (glass / classic) ----
+const UI_STYLE_KEY = 'zenithUiStyle';
+
+function applyUiStyle(style) {
+    document.body.classList.toggle('ui-classic', style === 'classic');
+    localStorage.setItem(UI_STYLE_KEY, style);
+}
+
+function initUiStyle() {
+    const saved = localStorage.getItem(UI_STYLE_KEY) || 'glass';
+    applyUiStyle(saved);
+}
+
+function initUiStyleToggle() {
+    const toggle = document.getElementById('uiStyleToggle');
+    if (!toggle) return;
+
+    const current = localStorage.getItem(UI_STYLE_KEY) || 'glass';
+    toggle.querySelectorAll('.ui-style-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.style === current);
+    });
+
+    toggle.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.ui-style-btn');
+        if (!btn) return;
+        const style = btn.dataset.style;
+        applyUiStyle(style);
+        toggle.querySelectorAll('.ui-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
+        // If switching to glass and modal containers were never created, warm them up now
+        if (style === 'glass' && typeof preWarmModalGlass === 'function') {
+            const hasGlass = !!document.querySelector('.modal-card .glass-container');
+            if (!hasGlass) await preWarmModalGlass();
+        }
     });
 }
 
@@ -240,6 +308,44 @@ function initCustomizeModal() {
         const url = icsInput?.value.trim() || '';
         if (window.CalendarWidget) window.CalendarWidget.setEcalendarUrl(url);
     };
+
+    // News feed select
+    const newsFeedSelect = document.getElementById('newsFeedSelect');
+    if (newsFeedSelect) {
+        const saved = localStorage.getItem('zenithNewsTheme');
+        if (saved) {
+            const opt = [...newsFeedSelect.options].find(o => o.value === saved);
+            if (opt) opt.selected = true;
+        }
+        newsFeedSelect.addEventListener('change', () => {
+            const val = newsFeedSelect.value;
+            localStorage.setItem('zenithNewsTheme', val);
+            localStorage.removeItem('zenithNewsCache');
+            if (window._newsWidgetInstance) {
+                window._newsWidgetInstance.theme = val;
+                window._newsWidgetInstance.fetchNews();
+            }
+        });
+    }
+
+    // Market asset select
+    const marketAssetSelect = document.getElementById('marketAssetSelect');
+    if (marketAssetSelect) {
+        const saved = localStorage.getItem('zenithMarketAsset');
+        if (saved) {
+            const opt = [...marketAssetSelect.options].find(o => o.value === saved);
+            if (opt) opt.selected = true;
+        }
+        marketAssetSelect.addEventListener('change', () => {
+            const val = marketAssetSelect.value;
+            localStorage.setItem('zenithMarketAsset', val);
+            localStorage.removeItem('zenithMarketCache');
+            if (window._marketWidgetInstance) {
+                window._marketWidgetInstance.assetId = val;
+                window._marketWidgetInstance.refresh();
+            }
+        });
+    }
 
     openBtn?.addEventListener('click', () => { renderGroqKeys(); renderMemory(); openModal(); });
     closeBtn?.addEventListener('click', closeModal);
@@ -341,8 +447,8 @@ function initChat() {
     const chatPanel   = document.getElementById('chatPanel');
     const mainContent = document.getElementById('mainContent');
     const glassRoot   = document.getElementById('glass-root');
-    const leftPanel   = document.querySelector('.left-panel');
-    const rightPanel  = document.querySelector('.right-panel');
+    const leftPanel   = document.getElementById('widgetColLeft');
+    const rightPanel  = document.getElementById('widgetColRight');
     const backBtn     = document.getElementById('chatBackBtn');
     const sendBtn     = document.getElementById('chatSendBtn');
     const textarea    = document.getElementById('chatInput');
@@ -357,6 +463,7 @@ function initChat() {
         if (isOpen) return;
         isOpen = true;
         chatPanel.style.pointerEvents = 'auto';
+        window._dockState = { activePanel: 'chat', close: closeChat };
 
         window.ZenithAI?._render();
         window.ZenithAI?.renderSidebar();
@@ -369,12 +476,19 @@ function initChat() {
     const closeChat = () => {
         if (!isOpen) return;
         isOpen = false;
+        window._dockState = null;
+        window._hideDock?.(false);
         macClose(chatPanel, 'chatBtn', bgEls, () => {
             chatPanel.style.pointerEvents = 'none';
         });
     };
 
-    document.getElementById('chatBtn')?.addEventListener('click', openChat);
+    document.getElementById('chatBtn')?.addEventListener('click', () => {
+        const state = window._dockState;
+        if (state?.activePanel === 'chat') { closeChat(); }
+        else if (state?.activePanel) { state.close(); setTimeout(openChat, 380); }
+        else { openChat(); }
+    });
 
     backBtn?.addEventListener('click', closeChat);
 
@@ -422,6 +536,10 @@ function initChat() {
 }
 
 // ---- Entrée principale ----
+// Apply visual preferences as early as possible (before DOMContentLoaded paints)
+initAccentColor();
+initUiStyle();
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Charger le fond
     loadBackground();
@@ -448,6 +566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 7. Modal personnalisation
     initCustomizeModal();
+    initUiStyleToggle();
+    initAccentPicker();
 
     // 8. Chat IA
     initChat();
@@ -455,6 +575,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 9. Notes
     initNotes();
+
+    // 10. Widget drag & drop
+    if (typeof initWidgetDrag === 'function') initWidgetDrag();
+
+    // 10b. News widget
+    if (typeof initNewsWidget === 'function') initNewsWidget();
+
+    // 10c. Market widget
+    if (typeof initMarketWidget === 'function') initMarketWidget();
+    if (typeof initF1Widget    === 'function') initF1Widget();
+
+    // 11. Widget toggles
+    initWidgetsToggle();
+
+    // 12. Dock magnification
+    initDockEffect();
 
 });
 
@@ -464,8 +600,8 @@ function initNotes() {
     const notesBackBtn = document.getElementById('notesBackBtn');
     const mainContent = document.getElementById('mainContent');
     const glassRoot   = document.getElementById('glass-root');
-    const leftPanel   = document.querySelector('.left-panel');
-    const rightPanel  = document.querySelector('.right-panel');
+    const leftPanel   = document.getElementById('widgetColLeft');
+    const rightPanel  = document.getElementById('widgetColRight');
 
     if (!notesPanel) return;
 
@@ -477,6 +613,7 @@ function initNotes() {
         if (isOpen) return;
         isOpen = true;
         notesPanel.style.pointerEvents = 'auto';
+        window._dockState = { activePanel: 'notes', close: closeNotes };
         macOpen(notesPanel, 'notesBtn', bgEls);
         setTimeout(() => window.ZenithNotes?.showGraph(), 420);
     };
@@ -484,12 +621,293 @@ function initNotes() {
     const closeNotes = async () => {
         if (!isOpen) return;
         isOpen = false;
+        window._dockState = null;
+        window._hideDock?.(false);
         await window.ZenithNotes?.flushSave?.();
         macClose(notesPanel, 'notesBtn', bgEls, () => {
             notesPanel.style.pointerEvents = 'none';
         });
     };
 
-    notesBtn?.addEventListener('click', openNotes);
+    notesBtn?.addEventListener('click', () => {
+        const state = window._dockState;
+        if (state?.activePanel === 'notes') { closeNotes(); }
+        else if (state?.activePanel) { state.close(); setTimeout(openNotes, 380); }
+        else { openNotes(); }
+    });
     notesBackBtn?.addEventListener('click', closeNotes);
+}
+
+// ---- Dock magnification ----
+
+function initDockEffect() {
+    const bar  = document.querySelector('.top-controls');
+    if (!bar) return;
+    const btns = Array.from(bar.querySelectorAll('.ctrl-btn'));
+    if (!btns.length) return;
+
+    const MAX_SCALE = 1.52;
+    const H_RANGE   = 72; // px d'influence horizontale depuis le centre du bouton
+    const V_RANGE   = 90;  // px sous la barre où l'effet commence à s'appliquer
+
+    let centers = [], naturalW = 44, gap = 12, barRect = null, isActive = false;
+
+    function cacheLayout() {
+        btns.forEach(b => { b.style.transition = ''; b.style.transform = ''; });
+        barRect = bar.getBoundingClientRect();
+        const rects = btns.map(b => b.getBoundingClientRect());
+        naturalW = rects[0]?.width  || 44;
+        gap      = rects.length > 1 ? rects[1].left - rects[0].right : 12;
+        centers  = rects.map(r => r.left + r.width / 2);
+    }
+    setTimeout(cacheLayout, 150);
+    window.addEventListener('resize', () => setTimeout(cacheLayout, 150));
+
+    // Smootherstep C² — transition sans dérivée brusque
+    function ss(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+
+    // Calcule les translateX pour maintenir l'espacement après scale
+    function computeTranslations(scales) {
+        const n = scales.length;
+        const totalMagW  = scales.reduce((s, sc) => s + sc * naturalW, 0) + (n - 1) * gap;
+        const groupCenter = (centers[0] + centers[n - 1]) / 2;
+        const magnLeft    = groupCenter - totalMagW / 2;
+        let x = magnLeft;
+        return scales.map((sc, i) => {
+            x += sc * naturalW / 2;
+            const newCenter = x;
+            x += sc * naturalW / 2 + gap;
+            return newCenter - centers[i];
+        });
+    }
+
+    function reset() {
+        isActive = false;
+        btns.forEach(b => {
+            b.style.transition = 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease';
+            b.style.transform  = '';
+        });
+    }
+
+    // ── Dock reveal over full-screen panels ──────────────────────────────────
+    let revealedOverPanel = false;
+
+    function revealDock() {
+        if (revealedOverPanel) return;
+        revealedOverPanel = true;
+        bar.style.zIndex = '65';
+        window._activatePanelSnapshot?.();
+        if (window.gsap) {
+            gsap.killTweensOf(bar);
+            gsap.fromTo(bar,
+                { y: 28, opacity: 0 },
+                { y: 0,  opacity: 1, duration: 0.28, ease: 'power3.out' }
+            );
+        }
+    }
+
+    // animate=true  → slide out (user moved mouse away, panel still open)
+    // animate=false → instant reset (panel is closing, dock reappears naturally under it)
+    function hideDock(animate = true) {
+        if (!revealedOverPanel) return;
+        revealedOverPanel = false;
+        if (!animate || !window.gsap) {
+            gsap?.killTweensOf(bar);
+            gsap?.set(bar, { clearProps: 'y,opacity' });
+            bar.style.zIndex = '';
+            window._deactivatePanelSnapshot?.();
+        } else {
+            gsap.killTweensOf(bar);
+            gsap.to(bar, { y: 28, opacity: 0, duration: 0.22, ease: 'power3.in', onComplete: () => {
+                bar.style.zIndex = '';
+                gsap.set(bar, { clearProps: 'y,opacity' });
+                window._deactivatePanelSnapshot?.();
+            }});
+        }
+    }
+
+    // Expose so panel close handlers can call it
+    // hideDock(false) = instant reset (panel closing), hideDock(true) = animated (mouse left)
+    window._hideDock = hideDock;
+
+    // Close dock when mouse leaves the bar area while revealed
+    document.addEventListener('mouseleave', () => { if (revealedOverPanel) hideDock(true); });
+
+    // État partagé mousemove → rAF (évite les DOM-writes à la fréquence souris)
+    let rafPending  = false;
+    let pendingMx   = 0, pendingMy = 0;
+    let needsReset  = false;
+
+    function applyDockFrame() {
+        rafPending = false;
+        const mx = pendingMx, my = pendingMy;
+
+        // Hot zone panel reveal
+        if (window._dockState?.activePanel) {
+            const dockLeft  = barRect.left  - 20;
+            const dockRight = barRect.right + 20;
+            if (my >= window.innerHeight - 10 && mx >= dockLeft && mx <= dockRight) {
+                revealDock();
+            } else if (revealedOverPanel) {
+                const inBar = mx >= barRect.left - 30 && mx <= barRect.right + 30
+                           && my >= barRect.top  - 20 && my <= barRect.bottom + 30;
+                if (!inBar) hideDock(true);
+            }
+        } else if (revealedOverPanel) {
+            hideDock(true);
+        }
+
+        if (needsReset) { reset(); needsReset = false; return; }
+
+        // Proximité verticale
+        let vProx = 0;
+        if (my >= barRect.top && my <= barRect.bottom) {
+            vProx = 1;
+        } else if (my > barRect.bottom && my <= barRect.bottom + V_RANGE) {
+            vProx = ss(1 - (my - barRect.bottom) / V_RANGE);
+        } else if (my >= barRect.top - V_RANGE && my < barRect.top) {
+            vProx = ss(1 - (barRect.top - my) / V_RANGE);
+        }
+
+        if (vProx <= 0) { if (isActive) reset(); return; }
+
+        isActive = true;
+        const scales = centers.map(c => {
+            const t = Math.max(0, 1 - Math.abs(mx - c) / H_RANGE);
+            const w = ss(t) * ss(t);
+            return 1 + (MAX_SCALE - 1) * w * vProx;
+        });
+        const tx = computeTranslations(scales);
+
+        btns.forEach((btn, i) => {
+            btn.style.transition = 'color 0.2s ease';
+            btn.style.transform  = `translateX(${tx[i].toFixed(2)}px) scale(${scales[i].toFixed(3)})`;
+        });
+        // Positions des boutons ont changé → invalider le cache getBCR des glass containers
+        window._invalidateGlassPositions?.();
+    }
+
+    document.addEventListener('mousemove', e => {
+        if (!barRect || !centers.length) return;
+        pendingMx = e.clientX;
+        pendingMy = e.clientY;
+
+        // Vérification légère hors rAF pour le reset (évite un frame de lag perceptible)
+        const my = pendingMy;
+        const inRange = (my >= barRect.top - V_RANGE && my <= barRect.bottom + V_RANGE);
+        if (!inRange && isActive) needsReset = true;
+
+        if (!rafPending) {
+            rafPending = true;
+            requestAnimationFrame(applyDockFrame);
+        }
+    });
+}
+
+// ---- Widget toggles ----
+
+function initWidgetsToggle() {
+    const btn   = document.getElementById('widgetsBtn');
+    const popup = document.getElementById('widgetsPopup');
+    if (!btn || !popup) return;
+
+    const WIDGETS = {
+        shortcuts: {
+            el: () => document.querySelector('.shortcuts-wrapper'),
+            key: 'zenithWidget_shortcuts',
+        },
+        calendar: {
+            el: () => document.getElementById('calendarWidget'),
+            key: 'zenithWidget_calendar',
+        },
+        weather: {
+            el: () => document.getElementById('weatherWidget'),
+            key: 'zenithWidget_weather',
+        },
+        news: {
+            el: () => document.getElementById('newsWidget'),
+            key: 'zenithWidget_news',
+        },
+        market: {
+            el: () => document.getElementById('marketWidget'),
+            key: 'zenithWidget_market',
+        },
+        f1: {
+            el: () => document.getElementById('f1Widget'),
+            key: 'zenithWidget_f1',
+        },
+    };
+
+    function isEnabled(id) {
+        const v = localStorage.getItem(WIDGETS[id].key);
+        return v === null ? true : v === '1';
+    }
+
+    function setEnabled(id, on) {
+        localStorage.setItem(WIDGETS[id].key, on ? '1' : '0');
+        applyVisibility(id, on);
+        updateToggleUI(id, on);
+        // Recalculer les overlays glass si besoin
+        if (typeof destroyOverlays === 'function' && typeof buildAndApplyOverlays === 'function') {
+            setTimeout(async () => {
+                destroyOverlays();
+                await buildAndApplyOverlays();
+                if (typeof preWarmModalGlass === 'function') await preWarmModalGlass();
+            }, 50);
+        }
+    }
+
+    function applyVisibility(id, on) {
+        const el = WIDGETS[id].el();
+        if (!el) return;
+        el.style.display = on ? '' : 'none';
+    }
+
+    function updateToggleUI(id, on) {
+        const toggle = popup.querySelector(`.wp-toggle[data-widget="${id}"]`);
+        if (toggle) toggle.classList.toggle('on', on);
+    }
+
+    // Appliquer l'état sauvegardé au chargement
+    Object.keys(WIDGETS).forEach(id => {
+        const on = isEnabled(id);
+        applyVisibility(id, on);
+        updateToggleUI(id, on);
+    });
+
+    // Clic sur les toggles
+    popup.querySelectorAll('.wp-toggle').forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = toggle.dataset.widget;
+            setEnabled(id, !isEnabled(id));
+        });
+    });
+
+    // Ouvrir / fermer le popup + activer/désactiver le mode édition widgets
+    let open = false;
+
+    function closeWidgetPopup() {
+        open = false;
+        popup.classList.remove('open');
+        btn.classList.remove('active');
+        window._setWidgetEditMode?.(false);
+    }
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        open = !open;
+        popup.classList.toggle('open', open);
+        btn.classList.toggle('active', open);
+        window._setWidgetEditMode?.(open);
+    });
+
+    // Fermer sur clic extérieur SEULEMENT si le mode édition n'est pas actif
+    document.addEventListener('click', (e) => {
+        if (!open) return;
+        if (window._isWidgetEditMode?.()) return; // ne pas fermer pendant le drag
+        closeWidgetPopup();
+    });
+
+    popup.addEventListener('click', e => e.stopPropagation());
 }
