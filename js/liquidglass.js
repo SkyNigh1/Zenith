@@ -136,17 +136,26 @@ function createGlassOverlay(targetEl, borderRadius) {
     const glassRoot = document.getElementById('glass-root');
     if (!glassRoot) return null;
 
-    const actualRadius = Math.min(borderRadius, Math.floor(rect.height / 2));
+    // getBoundingClientRect() retourne des coordonnées viewport (espace non-zoomé),
+    // mais position:fixed à l'intérieur d'un html zoomé interprète les valeurs dans
+    // l'espace zoomé → il faut diviser par le zoom pour aligner correctement.
+    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    const posTop    = rect.top    / zoom;
+    const posLeft   = rect.left   / zoom;
+    const posWidth  = rect.width  / zoom;
+    const posHeight = rect.height / zoom;
+
+    const actualRadius = Math.min(borderRadius, Math.floor(posHeight / 2));
     const container = new Container({ borderRadius: actualRadius, tintOpacity: 0.05 });
     const el = container.element;
 
     el.style.position  = 'absolute';
-    el.style.top       = rect.top    + 'px';
-    el.style.left      = rect.left   + 'px';
-    el.style.width     = rect.width  + 'px';
-    el.style.height    = rect.height + 'px';
-    el.style.minWidth  = rect.width  + 'px';
-    el.style.minHeight = rect.height + 'px';
+    el.style.top       = posTop    + 'px';
+    el.style.left      = posLeft   + 'px';
+    el.style.width     = posWidth  + 'px';
+    el.style.height    = posHeight + 'px';
+    el.style.minWidth  = posWidth  + 'px';
+    el.style.minHeight = posHeight + 'px';
     el.style.padding   = '0';
     if (targetEl.id) el.dataset.glassFor = targetEl.id;
     _overlayRadiusMap.set(targetEl, borderRadius); // mémoriser pour rebuild

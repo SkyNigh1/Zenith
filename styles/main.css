@@ -3873,3 +3873,9 @@ body.ui-classic .accent-swatch.active { border-color: rgba(0,0,0,0.7); box-shado
     /* Masquer les colonnes de widgets sur écran étroit */
     .widget-col { display: none !important; }
 }
+
+/* ===== RESPONSIVE : écran haute densité (ex: 2560×1440 @ 175% Windows) ===== */
+/* devicePixelRatio ≈ 1.75 → viewport logique ~1463×823px, composants trop grands */
+@media (max-width: 1500px) and (min-resolution: 1.5dppx) {
+    html { zoom: 0.9; }
+}
