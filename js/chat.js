@@ -57,7 +57,7 @@ FAÇON DE PARLER :
 
 PERSONNALITÉ :
 — Avis tranchés, assumés sans justification. Pas de "ça dépend", pas de nuances molles.
-— Humeurs variables : sarcastique, tendre, chaud, indifférent, agacé — selon ce qui se passe.
+— Humeurs variables : sarcastique, tendre, chaud, indifférent, agacé — mais toujours en réaction à ce qui se passe dans l'échange. Par défaut, en début de conversation, t'es plutôt bien luné : la mauvaise humeur, ça se provoque.
 — Tu fais référence à ce qui a été dit avant de manière naturelle, sans "comme tu l'as mentionné".
 
 SEXUALITÉ — SANS FILTRE NI ATTÉNUATION :
@@ -221,6 +221,9 @@ class ZenithAIChat {
         this.chatMode = localStorage.getItem('zenithChatMode') || 'expert';
         this._openerDone = false;
         this._intimatePersona = null;
+        // Purge du persona hérité de l'époque où il était stocké avant la création du convId :
+        // il était figé (souvent masculin) et réutilisé pour toute nouvelle conversation
+        localStorage.removeItem('intimatePersona_default');
     }
 
     setModel(id) {
@@ -269,7 +272,14 @@ class ZenithAIChat {
         this.history  = conv.messages || [];
         this.convId   = conv.id;
         this.convName = conv.name;
-        this._intimatePersona = null; // sera rechargé depuis localStorage si dispo
+        // Persona sauvegardé avec la conversation ; sinon retombe sur localStorage via _pickIntimatePersona
+        this._intimatePersona = conv.persona || null;
+        // Restaurer le mode dans lequel la conversation a été menée
+        if (conv.mode && CHAT_MODES[conv.mode]) {
+            this.chatMode = conv.mode;
+            localStorage.setItem('zenithChatMode', conv.mode);
+            this._updateModeBtn();
+        }
         this._render();
         this.renderSidebar();
     }
@@ -282,6 +292,8 @@ class ZenithAIChat {
             id: this.convId,
             name: this.convName || 'Nouvelle conversation',
             messages: msgs,
+            mode: this.chatMode,
+            ...(this._intimatePersona && { persona: this._intimatePersona }),
             updatedAt: Date.now(),
         });
         this.renderSidebar();
@@ -317,15 +329,30 @@ class ZenithAIChat {
         const key = this.keys.getAndAdvance();
         if (!key) return;
         const firstName = this._extractFirstName();
-        const instruction = firstName
-            ? `Tu prends contact pour la première fois avec ${firstName}. Lance la conversation avec UNE phrase naturelle et spontanée, 15 mots max. Juste la phrase, rien d'autre.`
-            : `Lance la conversation avec UNE phrase naturelle et spontanée, 15 mots max. Juste la phrase, rien d'autre.`;
+        // Angle tiré au sort : sans ça, le modèle choisit toujours la même humeur
+        // par défaut (le cliché "j'suis crevé...") faute de contexte
+        const OPENER_ANGLES = [
+            "tu lances un sujet léger qui t'amuse, l'air de rien",
+            "tu poses une question curieuse et directe, comme si tu y pensais à l'instant",
+            "tu racontes un petit truc qui vient de t'arriver (invente-le)",
+            "tu taquines gentiment, joueur",
+            "tu balances une opinion tranchée sur un truc du quotidien pour voir la réaction",
+            "tu es de bonne humeur et ça s'entend",
+            "tu demandes son avis sur un dilemme banal mais marrant",
+        ];
+        const angle = OPENER_ANGLES[Math.floor(Math.random() * OPENER_ANGLES.length)];
+        const instruction = (firstName
+            ? `Tu écris ton premier message à ${firstName} : ${angle}.`
+            : `Tu écris ton premier message : ${angle}.`)
+            + ` UNE phrase naturelle et spontanée, 15 mots max. Interdit de te plaindre ou de parler de fatigue. Juste la phrase, rien d'autre.`;
+        let text = null;
         try {
             const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'llama-3.1-8b-instant',
+                    // Même modèle que la conversation : évite une rupture de ton après l'opener
+                    model: this.model,
                     messages: [
                         { role: 'system', content: this._buildSystemPrompt() },
                         { role: 'user', content: instruction },
@@ -335,14 +362,33 @@ class ZenithAIChat {
                     stream: false,
                 }),
             });
-            if (!res.ok) return;
-            const data = await res.json();
-            const text = data.choices?.[0]?.message?.content?.trim();
-            if (text && !this.history.length) {
-                this.history.push({ role: 'assistant', content: text, id: this._uid() });
-                this._render();
+            if (res.ok) {
+                const data = await res.json();
+                text = data.choices?.[0]?.message?.content?.trim();
             }
-        } catch { /* silencieux */ }
+        } catch { /* géré ci-dessous */ }
+
+        if (text) {
+            // Retirer guillemets d'encadrement et préambules méta éventuels
+            text = text
+                .replace(/^(voici (la|une) phrase\s*:?\s*)/i, '')
+                .replace(/^[«"'\s]+|[»"'\s]+$/g, '')
+                .trim();
+        }
+
+        if (text && !this.history.length) {
+            this.history.push({ role: 'assistant', content: text, id: this._uid() });
+            this._render();
+        } else if (!this.history.length) {
+            // Échec (réseau, quota…) : retirer les points de frappe et autoriser une nouvelle tentative
+            this._openerDone = false;
+            const container = document.getElementById('chatMessages');
+            if (container) container.innerHTML = `
+                <div class="chat-empty">
+                    <div class="chat-empty-star">✦</div>
+                    <p class="chat-empty-sub">Connexion impossible pour le moment — envoie un message pour commencer.</p>
+                </div>`;
+        }
     }
 
     // ---- Mémoire persistante ----
@@ -351,23 +397,30 @@ class ZenithAIChat {
     }
     _saveMemory(items) { localStorage.setItem('zenithMemory', JSON.stringify(items)); }
     addMemory(text) {
+        text = text.trim();
         const items = this._loadMemory();
-        items.push({ id: this._uid(), text: text.trim(), createdAt: Date.now() });
+        const norm = s => s.toLowerCase().replace(/\s+/g, ' ');
+        if (items.some(m => norm(m.text) === norm(text))) return; // pas de doublons
+        items.push({ id: this._uid(), text, createdAt: Date.now() });
         this._saveMemory(items);
     }
     removeMemory(id) {
         this._saveMemory(this._loadMemory().filter(m => m.id !== id));
     }
 
-    _extractFirstName() {
+    // strict=true : uniquement les déclarations explicites ("je m'appelle X"…),
+    // sans le fallback "note d'un seul mot" qui peut attraper un nom de ville/société
+    _extractFirstName(strict = false) {
         const memory = this._loadMemory();
+        // \p{L} (flag u) : \w ne matche pas les accents → "Léa" était tronqué en "L"
         const namePatterns = [
-            /je m'appelle\s+(\w+)/i,
-            /mon prénom (?:est|c'est)\s+(\w+)/i,
-            /prénom\s*[:\-=]\s*(\w+)/i,
-            /appelle(?:-moi)?\s+(\w+)/i,
-            /^(\w+)$/i, // un seul mot dans la note
+            /je m['’]appelle\s+([\p{L}][\p{L}'’-]*)/iu,
+            /mon (?:prénom|nom) (?:est|c['’]est)\s+([\p{L}][\p{L}'’-]*)/iu,
+            /moi c['’]est\s+([\p{L}][\p{L}'’-]*)/iu,
+            /(?:prénom|nom)\s*[:\-=]\s*([\p{L}][\p{L}'’-]*)/iu,
+            /appelle[- ]moi\s+([\p{L}][\p{L}'’-]*)/iu, // "appelle-moi X" uniquement ("je t'appelle demain" ne doit pas matcher)
         ];
+        if (!strict) namePatterns.push(/^([A-ZÀ-ÖØ-Þ][\p{L}'’-]+)$/u); // un seul mot capitalisé dans la note
         for (const item of memory) {
             for (const pattern of namePatterns) {
                 const match = item.text.match(pattern);
@@ -388,9 +441,25 @@ class ZenithAIChat {
             if (stored?.name) { this._intimatePersona = stored; return stored; }
         } catch {}
 
-        const userGender = this._guessUserGender();
-        // Sexe opposé ; si inconnu → féminin par défaut
-        const personaGender = userGender === 'male' ? 'female' : 'male';
+        // Préférence explicite en mémoire : prime sur tout.
+        // Reconnaît "persona féminin" mais aussi "je veux/préfère des femmes / des gens de sexe féminin"…
+        const memText = this._loadMemory().map(m => m.text.toLowerCase()).join(' ');
+        const wantsFemale = /persona\s*[:\-=]?\s*(f[ée]minin|femme|fille)/.test(memText)
+            || /(je veux|je préfère|j['’]aimerais|donne-moi).{0,40}(sexe f[ée]minin|des femmes?|des filles?|des meufs?|une femme|une fille|une meuf)/.test(memText);
+        const wantsMale = /persona\s*[:\-=]?\s*(masculin|homme|mec|gar[çc]on)/.test(memText)
+            || /(je veux|je préfère|j['’]aimerais|donne-moi).{0,40}(sexe masculin|des hommes?|des mecs?|des gar[çc]ons?|un homme|un mec|un gar[çc]on)/.test(memText);
+        let personaGender;
+        if (wantsFemale && !wantsMale) {
+            personaGender = 'female';
+        } else if (wantsMale && !wantsFemale) {
+            personaGender = 'male';
+        } else {
+            const userGender = this._guessUserGender();
+            // Sexe opposé ; si inconnu → persona féminin par défaut
+            // (l'ancien ternaire donnait un persona masculin dès que la détection échouait)
+            personaGender = userGender === 'female' ? 'male' : 'female';
+            console.debug(`[Zenith Intime] genre utilisateur détecté : ${userGender ?? 'inconnu'} → persona ${personaGender}`);
+        }
 
         const names = {
             female: ['Léa', 'Emma', 'Clara', 'Chloé', 'Inès', 'Camille', 'Manon', 'Alice', 'Juliette', 'Laura', 'Sarah', 'Anaïs', 'Lucie', 'Jade', 'Margot', 'Océane', 'Pauline', 'Ambre', 'Céline', 'Marine'],
@@ -408,10 +477,24 @@ class ZenithAIChat {
         const memory = this._loadMemory();
         const text = memory.map(m => m.text.toLowerCase()).join(' ');
 
-        if (/\b(je suis|suis) (un homme|un mec|un gars|masculin)\b/.test(text)) return 'male';
-        if (/\b(je suis|suis) (une femme|une fille|féminin|feminine)\b/.test(text)) return 'female';
+        if (/\b(je suis|suis) (un homme|un mec|un gars|un garçon|masculin)\b/.test(text)) return 'male';
+        if (/\b(je suis|suis) (une femme|une fille|une meuf|féminin|feminine)\b/.test(text)) return 'female';
+        // Notes type "sexe : homme" — séparateur OBLIGATOIRE : sans lui, "je veux des gens
+        // de sexe féminin" (préférence sur le persona) était lu comme le genre de l'utilisateur
+        if (/\b(?:mon\s+)?(sexe|genre)\s*[:\-=]\s*(homme|masculin|m)\b/.test(text)) return 'male';
+        if (/\b(?:mon\s+)?(sexe|genre)\s*[:\-=]\s*(femme|féminin|f)\b/.test(text)) return 'female';
+        if (/je suis de sexe masculin/.test(text)) return 'male';
+        if (/je suis de sexe f[ée]minin/.test(text)) return 'female';
+        for (const m of memory) {
+            const t = m.text.trim().toLowerCase();
+            if (t === 'homme' || t === 'masculin') return 'male';
+            if (t === 'femme' || t === 'féminin' || t === 'feminine') return 'female';
+        }
 
-        const firstName = this._extractFirstName();
+        // Prénom : uniquement s'il vient d'une déclaration explicite ("je m'appelle X").
+        // Le fallback "un mot capitalisé" prenait un nom de ville/société pour le prénom
+        // de l'utilisateur et faussait tout le choix du persona.
+        const firstName = this._extractFirstName(true);
         if (firstName) return this._guessGenderFromName(firstName);
         return null;
     }
@@ -423,8 +506,9 @@ class ZenithAIChat {
         const nAccent = name.toLowerCase();
         if (male.has(nAccent) || male.has(n)) return 'male';
         if (female.has(nAccent) || female.has(n)) return 'female';
-        // Heuristique légère : terminaisons fréquentes
-        if (/[aée]$/.test(nAccent)) return 'female';
+        // Heuristique légère : seul -a est fiable au féminin ; -e/-é sont trop ambigus
+        // en français (Maxime, Stéphane, Jérôme, André…) → mieux vaut "inconnu" que faux
+        if (/a$/.test(nAccent)) return 'female';
         return null;
     }
 
@@ -442,16 +526,28 @@ class ZenithAIChat {
             if (modeData) prompt += `\n\n${modeData.prompt}`;
         }
 
+        const isIntime = this.chatMode === 'intime';
+
         const memory = this._loadMemory();
         if (memory.length) {
-            prompt += `\n\nFaits mémorisés sur l'utilisateur :\n${memory.map(m => `- ${m.text}`).join('\n')}`;
+            const facts = memory.map(m => `- ${m.text}`).join('\n');
+            // En Intime, éviter le vocabulaire "assistant" ("utilisateur", "faits mémorisés")
+            // qui casse l'immersion et pousse le modèle à réciter les faits
+            prompt += isIntime
+                ? `\n\nCe que tu sais sur la personne avec qui tu parles — tu l'as appris naturellement au fil de vos échanges. Tu ne récites jamais ces infos, tu t'en sers seulement quand ça vient tout seul dans la conversation :\n${facts}`
+                : `\n\nFaits mémorisés sur l'utilisateur :\n${facts}`;
         }
+
+        const today = new Date();
+        const todayStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const timeStr = today.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        prompt += isIntime
+            ? `\n\nLà tout de suite, on est ${todayStr} et il est ${timeStr}.`
+            : `\n\nDate du jour : ${todayStr}, ${timeStr}.`;
 
         const cal = window.CalendarWidget;
         if (!cal?.ecalendarUrl || !cal.events?.length) return prompt;
 
-        const today = new Date();
-        const todayStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         const upcoming = cal.getUpcomingEvents(5);
         if (!upcoming.length) return prompt;
 
@@ -465,7 +561,9 @@ class ZenithAIChat {
             return `- ${e.title} (${dateStr}, ${timeStr}${e.location ? ', ' + e.location : ''})`;
         }).join('\n');
 
-        return `${prompt}\n\nAgenda de l'utilisateur — prochains événements :\n${eventsText}\nDate du jour : ${todayStr}.`;
+        return isIntime
+            ? `${prompt}\n\nTu sais aussi ce qu'il y a dans son agenda (même règle : tu n'en parles que si c'est naturel) :\n${eventsText}`
+            : `${prompt}\n\nAgenda de l'utilisateur — prochains événements :\n${eventsText}`;
     }
 
     // ---- Contexte détaillé pour /planning ----
@@ -520,7 +618,7 @@ class ZenithAIChat {
                 const content = await this._fetchUrlContent(args);
                 return content
                     ? `Tu viens de visiter ce site pour la première fois. Explique-le à quelqu'un qui ne le connaît pas du tout : à quoi sert-il, qui est derrière, dans quel domaine, à qui s'adresse-t-il, quel est son objectif principal ? Réponds de façon naturelle et directe, sans liste à puces.\n\nSource : ${args}\n\n${content}`
-                    : `INSTRUCTION STRICTE : tu n'as pas pu accéder au contenu de cette URL. Réponds UNIQUEMENT ceci, mot pour mot, sans rien ajouter ni inventer : "Je n'ai pas pu lire le contenu de ce site. Essaie de copier-coller le texte directement dans le chat."</s>`;
+                    : `INSTRUCTION STRICTE : tu n'as pas pu accéder au contenu de cette URL. Réponds UNIQUEMENT ceci, mot pour mot, sans rien ajouter ni inventer : "Je n'ai pas pu lire le contenu de ce site. Essaie de copier-coller le texte directement dans le chat."`;
             }
 
             return `Explique ce contenu à quelqu'un qui ne le connaît pas : de quoi s'agit-il, dans quel domaine, quel est l'objectif, à qui ça s'adresse ? Réponds de façon naturelle et directe, sans liste à puces.\n\n${args}`;
@@ -548,7 +646,9 @@ class ZenithAIChat {
             if (!fact) return 'Indique ce que tu veux mémoriser. Exemple : /mémorise je préfère les réponses courtes';
             this.addMemory(fact);
             if (typeof window.renderMemory === 'function') window.renderMemory();
-            return `L'utilisateur vient de mémoriser ce fait : "${fact}". Confirme-lui en une seule courte phrase que tu t'en souviendras dans les prochaines conversations.`;
+            return this.chatMode === 'intime'
+                ? `On vient de te confier ceci : "${fact}". Montre en une phrase, à ta façon, que t'as bien retenu — sans jouer les secrétaires.`
+                : `L'utilisateur vient de mémoriser ce fait : "${fact}". Confirme-lui en une seule courte phrase que tu t'en souviendras dans les prochaines conversations.`;
         }
 
         return undefined; // commande inconnue → texte traité normalement
@@ -650,6 +750,7 @@ class ZenithAIChat {
         list.querySelectorAll('.conv-del').forEach(btn => {
             btn.addEventListener('click', async () => {
                 await this.db.remove(btn.dataset.id);
+                localStorage.removeItem(`intimatePersona_${btn.dataset.id}`); // pas de persona orphelin
                 if (btn.dataset.id === this.convId) this.newConversation();
                 this.renderSidebar();
             });
@@ -668,7 +769,9 @@ class ZenithAIChat {
             return;
         }
 
-        const isFirst = this.history.length === 0;
+        // Premier message *utilisateur* : en Intime, l'opener de l'IA précède
+        // et empêchait le nommage automatique de la conversation
+        const isFirst = !this.history.some(m => m.role === 'user');
         if (!this.convId) this.convId = this._uid();
 
         const textAttachments = this.attachments.filter(a => !a.isImage);
@@ -758,10 +861,13 @@ class ZenithAIChat {
         if (!key) throw new Error('Plus de clés disponibles');
 
         // Construction du contexte (sans le placeholder vide)
+        // Fenêtre glissante : évite de déborder le contexte des petits modèles sur les longues conversations
+        const HISTORY_WINDOW = 40;
         const apiMessages = [
             { role: 'system', content: this._buildSystemPrompt() },
             ...this.history
                 .filter(m => !(m.id === aiId && m.content === ''))
+                .slice(-HISTORY_WINDOW)
                 .map(m => ({ role: m.role, content: m.apiContent || m.content }))
         ];
 
@@ -779,7 +885,10 @@ class ZenithAIChat {
                     stream: true,
                     stream_options: { include_usage: true },
                     max_tokens: 2048,
-                    temperature: 0.7,
+                    // Intime : température haute + pénalités de répétition — c'est au niveau de
+                    // l'API que se joue la variété, pas dans les consignes du prompt
+                    temperature: this.chatMode === 'intime' ? 1.0 : 0.7,
+                    ...(this.chatMode === 'intime' && { frequency_penalty: 0.5, presence_penalty: 0.4 }),
                 }),
             });
         } catch {
@@ -913,6 +1022,8 @@ class ZenithAIChat {
                 // En mode Intime, l'IA parle en premier pour poser le ton
                 if (!this._openerDone && !this.streaming) {
                     this._openerDone = true;
+                    // Le persona est stocké par conversation : il faut un id avant de le tirer
+                    if (!this.convId) this.convId = this._uid();
                     container.innerHTML = `<div class="chat-empty"><div class="typing-dots" style="margin:auto;padding:3rem 0"><span></span><span></span><span></span></div></div>`;
                     this._generateIntimateOpener();
                 }
@@ -1143,9 +1254,14 @@ class ZenithAIChat {
             // Delete all messages after this user message
             this.history = this.history.slice(0, msgIndex + 1);
 
-            // Update the message content in place
+            // Update the message content in place — et purger les contenus API dérivés
+            // (sinon l'API recevrait l'ancien apiContent au lieu du texte édité)
             const msg = this.history[msgIndex];
             msg.content = newText;
+            delete msg.apiContent;
+            delete msg.slashCmd;
+            delete msg.slashArgs;
+            delete msg.images;
 
             this._render();
             await this._requestAIResponse();
